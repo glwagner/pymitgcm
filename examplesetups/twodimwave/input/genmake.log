@@ -1,0 +1,107 @@
+Get compiler version using: gfortran --version
+/usr/bin/gfortran
+GNU Fortran (Ubuntu 5.4.0-6ubuntu1~16.04.4) 5.4.0 20160609
+Copyright (C) 2015 Free Software Foundation, Inc.
+
+GNU Fortran comes with NO WARRANTY, to the extent permitted by law.
+You may redistribute copies of GNU Fortran
+under the terms of the GNU General Public License.
+For more information about these matters, see the file named COPYING
+
+<-- compiler version ----
+
+running: look_for_makedepend()
+ --> set MAKEDEPEND=$(TOOLSDIR)/xmakedepend
+
+running: check_HAVE_CLOC()
+ running: get_fortran_c_namemangling()
+ gcc -O0 -mcmodel=medium -c genmake_test.c
+genmake_test.c: In function 'tcall':
+genmake_test.c:1:31: warning: implicit declaration of function 'tsub' [-Wimplicit-function-declaration]
+ void tcall( char * string ) { tsub( string ); }
+                               ^
+ gfortran -fconvert=big-endian -fimplicit-none -mcmodel=medium -c genmake_tcomp.f
+ --> set FC_NAMEMANGLE='#define FC_NAMEMANGLE(X)  X ## _'
+gcc -O0 -mcmodel=medium -c genmake_tc_1.c
+gfortran -fconvert=big-endian -fimplicit-none -mcmodel=medium -o genmake_tc genmake_tc_2.f genmake_tc_1.o
+  HELLO WORLD   1499377914.2477019     
+ --> set HAVE_CLOC='t'
+
+running: check_HAVE_SETRLSTK()
+gcc -O0 -mcmodel=medium -c genmake_tc_1.c
+      program hello
+      external setrlstk
+      call setrlstk()
+      end
+gfortran -fconvert=big-endian -fimplicit-none -mcmodel=medium -o genmake_tc genmake_tc_2.f genmake_tc_1.o
+ --> set HAVE_SETRLSTK='t'
+
+running: check_HAVE_SIGREG()
+gcc -O0 -mcmodel=medium -c genmake_tc_1.c
+      program hello
+      integer anint
+      common /iv/ anint
+      external sigreg
+      call sigreg(anint)
+      end
+gfortran -fconvert=big-endian -fimplicit-none -mcmodel=medium -o genmake_tc genmake_tc_2.f genmake_tc_1.o
+ --> set HAVE_SIGREG='t'
+
+running: check_HAVE_STAT()
+gcc -O0 -mcmodel=medium -c genmake_tc_1.c
+      program hello
+      integer nbyte
+      call tfsize(nbyte)
+      print *," HELLO WORLD", nbyte
+      end
+gfortran -fconvert=big-endian -fimplicit-none -mcmodel=medium -o genmake_tc genmake_tc_2.f genmake_tc_1.o
+ --> set HAVE_STAT='t'
+
+running: check_netcdf_libs()
+===  genmake_tnc.F  >>>
+      program fgennc
+#include "netcdf.inc"
+      integer iret, ncid, xid
+      iret = nf_create('genmake_tnc.nc', NF_CLOBBER, ncid)
+      IF (iret .NE. NF_NOERR) write(*,*) NF_STRERROR(iret)
+      iret = nf_def_dim(ncid, 'X', 11, xid)
+      IF (iret .NE. NF_NOERR) write(*,*) NF_STRERROR(iret)
+      iret = nf_close(ncid)
+      IF (iret .NE. NF_NOERR) write(*,*) NF_STRERROR(iret)
+      end
+<<<  genmake_tnc.F  ===
+cat genmake_tnc.F |  cpp -traditional -P -DWORDLENGTH=4 -DNML_TERMINATOR -DHAVE_SYSTEM -DHAVE_FDATE -DHAVE_ETIME_SBR -DHAVE_CLOC -DHAVE_SETRLSTK -DHAVE_SIGREG -DHAVE_STAT -I. 
+gfortran  -fconvert=big-endian -fimplicit-none -mcmodel=medium -O3 -funroll-loops -c genmake_tnc.f  \ 
+  &&  gfortran  -fconvert=big-endian -fimplicit-none -mcmodel=medium -O3 -funroll-loops -o genmake_tnc.o 
+genmake_tnc.o: In function `MAIN__':
+genmake_tnc.f:(.text+0x1e): undefined reference to `nf_create_'
+genmake_tnc.f:(.text+0x4b): undefined reference to `nf_def_dim_'
+genmake_tnc.f:(.text+0x5f): undefined reference to `nf_close_'
+genmake_tnc.f:(.text+0xa6): undefined reference to `nf_strerror_'
+genmake_tnc.f:(.text+0x10b): undefined reference to `nf_strerror_'
+genmake_tnc.f:(.text+0x16d): undefined reference to `nf_strerror_'
+collect2: error: ld returned 1 exit status
+
+==> try again with added '-lnetcdf'
+cat genmake_tnc.F |  cpp -traditional -P -DWORDLENGTH=4 -DNML_TERMINATOR -DHAVE_SYSTEM -DHAVE_FDATE -DHAVE_ETIME_SBR -DHAVE_CLOC -DHAVE_SETRLSTK -DHAVE_SIGREG -DHAVE_STAT -I.  > genmake_tnc.f \ 
+ &&  gfortran  -fconvert=big-endian -fimplicit-none -mcmodel=medium -O3 -funroll-loops -c genmake_tnc.f \ 
+ &&  gfortran  -fconvert=big-endian -fimplicit-none -mcmodel=medium -O3 -funroll-loops -o genmake_tnc genmake_tnc.o  -lnetcdf
+genmake_tnc.o: In function `MAIN__':
+genmake_tnc.f:(.text+0x1e): undefined reference to `nf_create_'
+genmake_tnc.f:(.text+0x4b): undefined reference to `nf_def_dim_'
+genmake_tnc.f:(.text+0x5f): undefined reference to `nf_close_'
+genmake_tnc.f:(.text+0xa6): undefined reference to `nf_strerror_'
+genmake_tnc.f:(.text+0x10b): undefined reference to `nf_strerror_'
+genmake_tnc.f:(.text+0x16d): undefined reference to `nf_strerror_'
+collect2: error: ld returned 1 exit status
+
+==> try again with added '-lnetcdff -lnetcdf'
+cat genmake_tnc.F |  cpp -traditional -P -DWORDLENGTH=4 -DNML_TERMINATOR -DHAVE_SYSTEM -DHAVE_FDATE -DHAVE_ETIME_SBR -DHAVE_CLOC -DHAVE_SETRLSTK -DHAVE_SIGREG -DHAVE_STAT -I.  > genmake_tnc.f \ 
+ &&  gfortran  -fconvert=big-endian -fimplicit-none -mcmodel=medium -O3 -funroll-loops -c genmake_tnc.f \ 
+ &&  gfortran  -fconvert=big-endian -fimplicit-none -mcmodel=medium -O3 -funroll-loops -o genmake_tnc genmake_tnc.o  -lnetcdf
+check_netcdf: successful
+ --> set HAVE_NETCDF='t'
+
+running: check_HAVE_FLUSH()
+  check_HAVE_FLUSH: successful
+ --> set HAVE_FLUSH='t'

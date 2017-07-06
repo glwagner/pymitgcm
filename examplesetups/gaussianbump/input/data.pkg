@@ -1,0 +1,7 @@
+# Packages
+ &PACKAGES
+ useOBCS     = .true.,
+ usePtracers = .true.,
+ useRBCS     = .true.,
+ useMNC      = .true.,
+ /

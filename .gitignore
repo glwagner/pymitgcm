@@ -1,0 +1,11 @@
+# gitignore for processgcm.
+
+# Ignore everything in directories called "run" or "build"
+**/run
+**/build
+
+# Ignore binary files, netcdf files, data/meta files.
+**/*.bin
+**/*.nc
+**/*.data
+**/*.meta
