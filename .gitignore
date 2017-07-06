@@ -4,6 +4,9 @@
 **/run
 **/build
 
+# Ignore CVS directories
+**/CVS
+
 # Ignore binary files, netcdf files, data/meta files.
 **/*.bin
 **/*.nc
