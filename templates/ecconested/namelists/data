@@ -1,0 +1,155 @@
+### Data file with primary model parameters -----------------------------------
+#
+
+### Continuous equation parameters -------------------------------------------- 
+ &PARM01
+## Reference temperatures and salinities for every vertical level.
+ tRef =  18.89, 18.89, 18.89, 18.89, 18.89, 18.87, 18.85, 18.82,
+         18.80, 18.73, 18.63, 18.49, 18.28, 18.08, 17.86, 17.63,
+         17.40, 17.18, 16.95, 16.73, 16.52, 16.31, 16.10, 15.89,
+         15.69, 15.49, 15.28, 15.08, 14.88, 14.67, 14.47, 14.25,
+         14.03, 13.80, 13.55, 13.29, 13.01, 12.73, 12.42, 12.11,
+         11.78, 11.43, 11.07, 10.70, 10.31,  9.93,  9.53,  9.11,
+          8.71,  8.29,  7.89,  7.51,  7.13,  6.78,  6.44,  6.11,
+          5.81,  5.51,  5.23,  4.97,  4.73,  4.51,  4.30,  4.11,
+          3.94,  3.78,  3.63,  3.50,  3.38,  3.25,  3.14,  3.04,
+          2.94,  2.83,  2.74,  2.64,  2.54,  2.45,  2.36,  2.27,
+          2.19,  2.10,  2.03,  1.95,  1.86,  1.78,  1.70,  1.63,
+          1.55,  1.48,  1.41,  1.34,  1.27,  1.20,  1.13,  1.06,
+          1.00,  0.96,  0.93,  0.91,
+ sRef =  34.84, 34.84, 34.84, 34.84, 34.84, 34.84, 34.85, 34.85,
+         34.85, 34.86, 34.87, 34.88, 34.90, 34.91, 34.93, 34.95,
+         34.96, 34.98, 34.99, 35.00, 35.01, 35.02, 35.03, 35.04,
+         35.05, 35.06, 35.07, 35.07, 35.07, 35.07, 35.07, 35.07,
+         35.07, 35.06, 35.05, 35.04, 35.03, 35.02, 35.01, 34.99,
+         34.97, 34.95, 34.92, 34.90, 34.87, 34.84, 34.81, 34.78,
+         34.75, 34.72, 34.69, 34.67, 34.65, 34.62, 34.61, 34.60,
+         34.59, 34.59, 34.58, 34.59, 34.59, 34.60, 34.60, 34.61,
+         34.62, 34.63, 34.64, 34.65, 34.66, 34.67, 34.67, 34.68,
+         34.69, 34.70, 34.71, 34.71, 34.72, 34.72, 34.73, 34.73,
+         34.73, 34.74, 34.74, 34.74, 34.74, 34.75, 34.74, 34.74,
+         34.74, 34.74, 34.74, 34.74, 34.74, 34.74, 34.73, 34.73,
+         34.73, 34.73, 34.73, 34.73,
+ rhonil        = 1029.,
+ rhoConstFresh = 1000.,
+ eosType = 'JMD95Z',
+#
+## Various prescriptions for viscosity and diffusivity.
+ viscAr     = 5.e-04,
+ viscA4Grid = 0.0,
+ diffKhT    = 0.E0,
+ diffKhS    = 0.E0,
+ diffK4T    = 0.E10,
+ diffK4S    = 0.E10,
+ diffKrT    = 1.0e-5,
+ diffKrS    = 1.0e-5,
+ bottomDragQuadratic = 0.002,
+ no_slip_sides     = .TRUE.,
+ no_slip_bottom    = .TRUE.,
+ implicitDiffusion = .TRUE.,
+ implicitViscosity = .TRUE.,
+# horizontal momentum closure
+ viscC4Leith   = 2.0,
+ viscC4Leithd  = 2.0,
+ viscA4GridMax = 0.8,
+#
+## Parameters that control numerical methods like advection schemes and 
+#  treatment of the free-surface.
+ tempAdvScheme = 7,
+ saltAdvScheme = 7,
+ implicitFreeSurface     = .TRUE.,
+ staggerTimeStep         = .TRUE.,
+ exactConserv            = .TRUE.,
+ vectorInvariantMomentum = .TRUE.,
+ useAreaViscLength       = .TRUE.,
+ highOrderVorticity      = .TRUE.,
+ multiDimAdvection       = .TRUE.,
+#
+## These parameters seem to be associated with the external forcing.
+ convertFW2Salt = -1.,
+ temp_EvPrRn    =  0.,
+ useRealFreshWaterFlux = .FALSE.,
+ allowFreezing         = .FALSE.,
+#
+## Parameters associated with bathymetry specification.
+ hFacMin   = 0.2,
+ hFacMinDr = 5.,
+#
+## Parameters for reading, writing, and misc numerical details.
+ globalFiles     = .TRUE.,
+ useSingleCpuIO  = .TRUE.,
+ readBinaryPrec  = 32,
+ writeBinaryPrec = 32,
+ debuglevel      = 2,
+#
+## Unused parameters.
+# gravity = 9.81,
+# viscA4Grid = 2.0E-3,
+# viscAhGrid = 2.5E-4,
+# bottomDraglinear    = 1.E-3,
+# Note: nonlinFreeSurf=1 with rStar=0 breaks the code.
+# nonlinFreeSurf = 4,
+# select_rStar   = 1,
+# hFacInf   = 0.1,
+# hFacSup   = 5.,
+# implicSurfPress = 0.6,
+# implicDiv2DFlow = 0.6,
+# useSingleCpuInput = .TRUE.,
+# set to eccov4, make sure minbathy=20m first
+# debuglevel = -1,
+# useJamartWetPoints = .TRUE.,
+# writeBinaryPrec=64,
+ /
+### Elliptic solver parameters ------------------------------------------------ 
+ &PARM02
+## Should these ever be changed?
+ cg2dMaxIters       = 200,
+ cg2dTargetResidual = 1.E-8,
+#
+#cg2dMaxIters       = 100,
+#cg2dTargetResidual = 1.E-5,
+ &
+### Time stepping parameters -------------------------------------------------- 
+ &PARM03
+ deltaT      =    240.,
+ nIter0      =       0,
+ nTimeSteps  =   65280,
+ pChkptFreq  = 864000.,
+ monitorFreq =   3600.,
+ abEps       = 0.1,
+## It is unclear what these specify.
+ pickupStrictlyMatch = .FALSE.,
+ forcing_In_AB       = .FALSE.,
+ momDissip_In_AB     = .FALSE.,
+ dumpInitAndLast     = .FALSE.,
+ /
+### Gridding parameters ------------------------------------------------------- 
+ &PARM04
+## When using a curvilinear grid, only the vertical grid is specified.
+ usingCurvilinearGrid = .TRUE.,
+## Specify the height of each vertical level.
+ delR =   5.00,   5.00,   5.00,   5.00,   5.00,   5.00,   5.00,   5.00,   5.00,
+          5.00,   5.00,   5.00,   5.00,   5.00,   5.00,   5.01,   5.01,   5.02,
+          5.04,   5.07,   5.12,   5.20,   5.31,   5.49,   5.72,   6.04,   6.45,
+          6.97,   7.62,   8.42,   9.36,  10.46,  11.72,  13.13,  14.70,  16.40,
+         18.24,  20.18,  22.21,  24.29,  26.43,  28.57,  30.71,  32.79,  34.82,
+         36.76,  38.60,  40.30,  41.87,  43.28,  44.54,  45.64,  46.58,  47.38,
+         48.03,  48.55,  48.96,  49.29,  49.53,  49.72,  49.90,  50.11,  50.41,
+         50.92,  51.69,  52.87,  54.54,  56.79,  59.67,  63.16,  67.26,  71.83,
+         76.83,  82.11,  87.61,  93.22,  98.91, 104.64, 110.38, 116.12, 121.87,
+        127.63, 133.38, 139.12, 144.87, 150.63, 156.38, 162.12, 167.87, 173.63,
+        179.38, 185.12, 190.87, 196.63, 202.38, 208.12, 213.87, 219.63, 225.38,
+        231.12, 
+ /
+# ----------------------------------------------------------------------------- 
+### Bathymetry files and initial condition files
+ &PARM05
+ bathyFile       = 'bathy.bin',
+ hydrogThetaFile = 'initial_T.bin',
+ hydrogSaltFile  = 'initial_S.bin',
+ uVelInitFile    = 'initial_U.bin',
+ vVelInitFile    = 'initial_V.bin',
+# diffKrFile  = 'diffkr_basin_v1m9EfC_llc1080.bin',
+# viscA4Dfile = 'visc3DblendfromrunobcsCdiv1e6_08Mar2016_aste2160.bin',
+# viscA4Zfile = 'visc3DblendfromrunobcsCdiv1e6_08Mar2016_aste2160.bin',
+ /

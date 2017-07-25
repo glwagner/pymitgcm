@@ -1,0 +1,73 @@
+# ***************
+# Open boundaries
+# ***************
+ &OBCS_PARM01
+OB_Jnorth = 720*405, 480*0, 
+OB_Jsouth = 720*120, 480*0, 
+OB_Ieast = 480*0, 240*361, 
+OB_Iwest = 480*0, 240*76, 
+#
+ useOBCSprescribe=.TRUE.,
+# useOBCSsponge=.true.,
+ OBCS_monSelect = 3,
+# >0: use 1rst O. upwind adv-scheme @ OB (=1: only if outflow)
+ OBCS_u1_adv_T = 1,
+ OBCS_u1_adv_S = 1,
+#
+ OBSsFile='obc_south_S.bin',
+ OBStFile='obc_south_T.bin',
+ OBSuFile='obc_south_U.bin',
+ OBSvFile='obc_south_V.bin',
+#
+ OBNsFile='obc_north_S.bin',
+ OBNtFile='obc_north_T.bin',
+ OBNuFile='obc_north_U.bin',
+ OBNvFile='obc_north_V.bin',
+#
+ OBEsFile='obc_east_S.bin',
+ OBEtFile='obc_east_T.bin',
+ OBEuFile='obc_east_U.bin',
+ OBEvFile='obc_east_V.bin',
+#
+ OBWsFile='obc_west_S.bin',
+ OBWtFile='obc_west_T.bin',
+ OBWuFile='obc_west_U.bin',
+ OBWvFile='obc_west_V.bin',
+# Balancing
+ useOBCSbalance = .TRUE.,
+ OBCS_balanceFacN = -1,
+ OBCS_balanceFacS = -1,
+ OBCS_balanceFacE = -1,
+ OBCS_balanceFacW = -1,
+## *****************************************
+## Tidal BC parameters
+## *****************************************
+ useOBCStides = .TRUE.,
+##components   = M2       S2     N2       K2       K1      O1       P1       Q1       Mf         Mm
+##periods (hr) = 12.4206  12     12.6583  11.9672  23.9345 25.8193  24.0659  26.8684  327.8599   661.31
+##period(sec)  = 44714.165 43200.001 45570.054 43082.05 86164.077 92949.636 86637.2 96726.086 1180295.5 2380715.9
+##components      m2        s2        n2        k2        k1        o1        p1        q1        mf        mm        m4        ms4       mn4          
+##period (hr): 12.420601 12.000000 12.658348 11.967236 23.934466 25.819343 24.065889 26.868357 327.859874 661.309962 6.210303 6.103339 6.269178
+##period (s):  44714.165192 43200.001287 45570.053512 43082.050319 86164.077005 92949.635701 86637.199772 96726.085703 1180295.545550 2380715.863587 22357.090551 21972.021930 22569.042448
+ tidalPeriod  = 44714.165 43200.001 45570.054 43082.050 86164.077 92949.636 86637.200 96726.086 1180295.546 2380715.864 22357.091 21972.022 22569.042,
+ OBSamFile='obc_south_tideAmp.bin',
+ OBNamFile='obc_north_tideAmp.bin',
+ OBWamFile='obc_west_tideAmp.bin',
+ OBEamFile='obc_east_tideAmp.bin',
+ OBSphFile='obc_south_tidePha.bin',
+ OBNphFile='obc_north_tidePha.bin',
+ OBWphFile='obc_west_tidePha.bin',
+ OBEphFile='obc_east_tidePha.bin',
+ &
+# *****************************************
+# Sponge Layer Parameters.
+# *****************************************
+ &OBCS_PARM03
+# Urelaxobcsinner=2629800.E0,
+# Urelaxobcsbound=43200.E0,
+#
+# Vrelaxobcsinner=2629800.E0,
+# Vrelaxobcsbound=43200.E0,
+#
+# spongeThickness=16,
+ &

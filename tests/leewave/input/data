@@ -10,10 +10,10 @@
        -0.0127421, -0.0178389, -0.0229358, -0.0280326,
        -0.0331295, -0.0382263, -0.0433231, -0.04842,
  sRef = 20*35.,
- viscAz  = 1.E-3,
- viscAh  = 1.E-2,
- diffKhT = 1.E-2,
- diffKzT = 1.E-3,
+ viscAz  = 0.001
+ viscAh  = 0.01
+ diffKhT = 0.01
+ diffKzT = 0.001
  no_slip_sides  = .false.,
  no_slip_bottom = .false.,
  f0   = 0.0,
@@ -48,11 +48,11 @@
 # Time stepping parameters
  &PARM03
  nIter0      = 0,
- nTimeSteps  = 1000,
- deltaT      = 500.,
+ nTimeSteps  = 10000
+ deltaT      = 100.0
  abEps       = 0.1,
- pChkptFreq  = 100000.,
- chkptFreq   = 100000.,
+ pChkptFreq  = 100000.0
+ chkptFreq   = 100000.0
  dumpFreq    = 50000.,
  monitorFreq = 2500.,
  monitorSelect = 2,
@@ -68,6 +68,6 @@
 
 # Input datasets
  &PARM05
- hydrogThetaFile='ini_T.bin',
- bathyFile='bathy.bin',
+ hydrogThetaFile='init_T.bin',
+ bathyFile='topo.bin',
  &

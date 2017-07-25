@@ -1,6 +1,3 @@
-C $Header: /u/gcmpack/MITgcm/verification/internal_wave/code/SIZE.h,v 1.6 2008/12/18 19:48:20 jmc Exp $
-C $Name:  $
-C
 C     /==========================================================\
 C     | SIZE.h Declare size of underlying computational grid.    |
 C     |==========================================================|
@@ -36,7 +33,7 @@ C     Nr  - No. points in Z for full process domain.
       INTEGER Ny
       INTEGER Nr
       PARAMETER (
-     &           sNx =  60,
+     &           sNx = 200,
      &           sNy =   1,
      &           OLx =   2,
      &           OLy =   2,
@@ -46,7 +43,7 @@ C     Nr  - No. points in Z for full process domain.
      &           nPy =   1,
      &           Nx  = sNx*nSx*nPx,
      &           Ny  = sNy*nSy*nPy,
-     &           Nr  =  20)
+     &           Nr  = 200)
 
 C     MAX_OLX  - Set to the maximum overlap region size of any array
 C     MAX_OLY    that will be exchanged. Controls the sizing of exch

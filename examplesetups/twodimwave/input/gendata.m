@@ -46,6 +46,9 @@ t=0.0*rand([nx,ny,nz]);
 for k=1:nz
 t(:,:,k) = t(:,:,k) + Tref(k);
 end
+size(t)
+plot(squeeze(t(1, 1, :)), z)
+pause
 fid=fopen('T.init','w',ieee); fwrite(fid,t,prec); fclose(fid);
 
 % Sloping channel 

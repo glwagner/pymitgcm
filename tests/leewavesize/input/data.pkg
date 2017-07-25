@@ -1,0 +1,4 @@
+&packages
+    useobcs = .true.
+    usemnc = .true.
+/

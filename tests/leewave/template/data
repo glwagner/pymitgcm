@@ -49,7 +49,7 @@
  &PARM03
  nIter0      = 0,
  nTimeSteps  = 1000,
- deltaT      = 500.,
+ deltaT      = 100.,
  abEps       = 0.1,
  pChkptFreq  = 100000.,
  chkptFreq   = 100000.,
@@ -68,6 +68,6 @@
 
 # Input datasets
  &PARM05
- hydrogThetaFile='ini_T.bin',
- bathyFile='bathy.bin',
+ hydrogThetaFile='init_T.bin',
+ bathyFile='topo.bin',
  &
