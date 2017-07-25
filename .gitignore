@@ -1,13 +1,7 @@
-# gitignore for processgcm.
-
-# Ignore everything in directories called "run" or "build"
+**/CVS
 **/run
 **/build
-
-# Ignore CVS directories
-**/CVS
-
-# Ignore binary files, netcdf files, data/meta files.
+**/MITgcm
 **/*.bin
 **/*.nc
 **/*.data
