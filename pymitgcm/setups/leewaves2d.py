@@ -7,26 +7,29 @@ from ..openboundaryconditions   import OpenBoundaryCondition
 
 
 class TwoDimLeeWaveModel(RectangularModel):
-    def __init__(self, nx, nz, Lx, Lz, Ly=1.0, N=None, U0=None, gcmdir=None):
+    def __init__(self, nx, nz, Lx, Lz, Ly=1.0, N=1e-3, U0=0.0, gcmdir=None):
         """ Instantiate a two-dimensional MITgcm model for lee waves. """
 
         RectangularModel.__init__(self, nx, 1, nz, Lx, Ly, Lz, gcmdir=gcmdir)
 
-        self.ic = InitialCondition(self)
         self.templatedir = os.path.abspath('../../templates/openboundary2d')
+
+        self.phys['gravity'] = 9.81
+        self.phys['talpha'] = 2e-4
+        self.phys['sbeta'] = 0.0
+
+        self.ic = InitialCondition(self)
+        self.ic.set_constant_stratification(N=N, 
+            g=self.phys['gravity'], alpha=self.phys['talpha'])    
 
         self.obcs = {}
         self.obcs['east'] = OpenBoundaryCondition(self, 'east')
         self.obcs['west'] = OpenBoundaryCondition(self, 'west')
 
-        if N is not None:
-            self.ic.set_constant_stratification(N=N)    
-
-            if U0 is not None:
-                self.ic.add_barotropic_flow(U=U0)
-                self.obcs['east'].continue_ic(self.ic)
-                self.obcs['west'].continue_ic(self.ic)
-
+        self.obcs['east'].continue_ic(self.ic)
+        self.obcs['west'].continue_ic(self.ic)
+        self.obcs['east'].add_uvel(U=U0)
+        self.obcs['west'].add_uvel(U=U0)
 
 
 
@@ -50,7 +53,6 @@ def add_gaussian_topo(model, H=None, L=None):
 
     model.topo = -model.Lz + H*np.exp( 
         -(model.x-0.5*model.Lx)**2.0 / (2.0*L**2.0) )
-    model.topo[-1] = 0.0
 
 
 

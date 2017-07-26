@@ -9,8 +9,9 @@ import gentools
 # ----------------------------------------------------------------------------- 
 # ----------------------------------------------------------------------------- 
 # Prepare set up
-gcmdir  = '/Users/glwagner/Software/MITgcm'
-optfile = '{}/tools/build_options/neve'.format(gcmdir)
+#gcmdir  = '/Users/glwagner/Software/MITgcm'
+gcmdir  = '/data5/glwagner/Numerics/pymitgcm/MITgcm'
+optfile = '{}/tools/build_options/sverdrup_glwagner'.format(gcmdir)
 
 # Domain
 Lx = 13.3e3
@@ -67,7 +68,8 @@ setupdirs = {
     'rundir'   : '{}/run'.format(workdir),
 }
 
-templdir = '/Users/glwagner/Numerics/gcmprocess/templates/leewave'
+#templdir = '/Users/glwagner/Numerics/gcmprocess/templates/leewave'
+templdir = '/data5/glwagner/Numerics/pymitgcm/templates/leewave'
 nametempldir = '{}/namelists'.format(templdir)
 codetempldir = '{}/code'.format(templdir)
 

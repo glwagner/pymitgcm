@@ -29,15 +29,16 @@ class OpenBoundaryCondition:
             self.nn = model.nx
             self.I = np.arange(0, model.nx)
             self.J = (model.ny-1) * np.ones((model.nx,), dtype=np.int64)
-        elif edge is 'east':
+        elif edge is 'west':
             self.n = model.y
             self.nn = model.ny
             self.I = np.zeros((model.ny,), dtype=np.int64)
             self.J = np.arange(0, model.ny)
-        elif edge is 'west':
+        elif edge is 'east':
             self.n = model.y
             self.nn = model.ny
-            self.I = (model.nx-1) * np.ones((model.ny,), dtype=np.int64)
+            #self.I = (model.nx-1) * np.ones((model.ny,), dtype=np.int64)
+            self.I = model.nx * np.ones((model.ny,), dtype=np.int64)
             self.J = np.arange(0, model.ny)
 
 
@@ -59,28 +60,47 @@ class OpenBoundaryCondition:
         gcmutils.savegcminput(savevars, savedir=savedir)
 
 
-    def set_uvel(U):
+    def add_uvel(self, U):
         """ Set the eastward velocity of the open boundary condition. """
-        self.fields['U'] = U
+
+        if 'U' not in self.fields.keys():
+            self.fields['U'] = np.zeros((self.nn, self.nz)) + U
+        else:
+            self.fields['U'] += U
 
 
-    def set_vvel(V):
+    def set_vvel(self, V):
         """ Set the northward velocity of the open boundary condition. """
-        self.fields['V'] = V
+
+        if 'V' not in self.fields.keys():
+            self.fields['V'] = np.zeros((self.nn, self.nz)) + V
+        else:
+            self.fields['V'] += V
 
 
-    def set_theta(T):
+    def set_theta(self, T):
         """ Set the temperature distribution the open boundary condition. """
-        self.fields['T'] = T
+
+        if 'T' not in self.fields.keys():
+            self.fields['T'] = np.zeros((self.nn, self.nz)) + T
+        else:
+            self.fields['T'] += T
 
 
-    def set_salt(S):
+    def set_salt(self, S):
         """ Set the salinity distribution the open boundary condition. """
-        self.fields['S'] = S
+
+        if 'S' not in self.fields.keys():
+            self.fields['S'] = np.zeros((self.nn, self.nz)) + S
+        else:
+            self.fields['S'] += S
 
 
-    def continue_ic(ic):
+    def continue_ic(self, ic):
         """ Continue an initial condition into the open boundary """
 
         for fieldname, field in ic.fields.items():
-            self.fields[fieldname] = field[self.I, self.J, :].squeeze()
+            try:
+                self.fields[fieldname] = field[self.I, self.J, :].squeeze()
+            except:
+                self.fields[fieldname] = field[self.I-1, self.J, :].squeeze()

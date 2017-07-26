@@ -4,5 +4,5 @@ from .openboundaryconditions import OpenBoundaryCondition
 
 from .gcmutils import (
     rungcm, compile, genmake, makedepend, make, 
-    changesize, siftdict, savegcminput, truncate,
+    changesizevar, changesizevars, siftdict, savegcminput, truncate,
 )

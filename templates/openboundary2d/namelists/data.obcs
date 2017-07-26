@@ -7,6 +7,8 @@
 # OB_Iwest = 0,
  &OBCS_PARM01
  useOBCSprescribe = .true.,
+ ob_ieast = -1
+ ob_iwest = -1
  OBCS_monitorFreq = 1200.,
  OBCS_monSelect = 1,
  &

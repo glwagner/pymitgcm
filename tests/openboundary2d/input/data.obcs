@@ -1,5 +1,0 @@
-&obcs_parm01
-    useobcsprescribe = .true.
-    obcs_monitorfreq = 1200.0
-    obcs_monselect = 1
-/

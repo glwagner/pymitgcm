@@ -1,0 +1,11 @@
+&obcs_parm01
+    useobcsprescribe = .true.
+    ob_ieast = 200
+    ob_iwest = 0
+    obcs_monitorfreq = 1200.0
+    obcs_monselect = 1
+    obetfile = 'obc_east_T.bin'
+    obeufile = 'obc_east_U.bin'
+    obwtfile = 'obc_west_T.bin'
+    obwufile = 'obc_west_U.bin'
+/

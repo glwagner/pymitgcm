@@ -39,17 +39,17 @@ class InitialCondition:
         gcmutils.savegcminput(savevars, savedir=savedir)
             
 
-    def set_theta(T):
+    def set_theta(self, T):
         """ Set potential temperature profile of the initial condition. """ 
         self.fields['T'] = T
 
 
-    def set_salt(S):
+    def set_salt(self, S):
         """ Set the salinity profile of the initial condition. """ 
         self.fields['S'] = S
 
 
-    def add_uvel(U):
+    def add_uvel(self, U):
         """ Add an eastward velocity to the initial condition. """ 
 
         if 'U' not in self.fields.keys():
@@ -58,7 +58,7 @@ class InitialCondition:
             self.fields['U'] += U
 
 
-    def add_vvel(V):
+    def add_vvel(self, V):
         """ Add northward velocity of the initial condition. """ 
 
         if 'V' not in self.fields.keys():
@@ -68,7 +68,7 @@ class InitialCondition:
 
 
 
-    def add_theta(T):
+    def add_theta(self, T):
         """ Add potential temperature profile of the initial condition. """ 
 
         if 'T' not in self.fields.keys():
@@ -77,7 +77,7 @@ class InitialCondition:
             self.fields['T'] += T
 
 
-    def add_salt(S):
+    def add_salt(self, S):
         """ Add salinity profile of the initial condition. """
 
         if 'S' not in self.fields.keys():
@@ -86,23 +86,20 @@ class InitialCondition:
             self.fields['S'] += S
 
 
-    def set_constant_stratification(N=1e-3, g=9.81, alpha=2e-3, T0=2.0):
+    def set_constant_stratification(self, N=1e-3, g=9.81, alpha=2e-3, T0=0.0):
         """ Set initial condition to a constant temperature stratification. """
 
         Tz = N**2.0 / (g*alpha) 
-        Tref = Tz*model.z - (Tz*model.z).mean()
+        T = Tz*self.model.z
+        T += T0
 
         self.set_theta(
               np.ones((self.nx, self.ny))[:, :, np.newaxis]
-            * Tref[np.newaxis, np.newaxis, :]
+            * T[np.newaxis, np.newaxis, :]
         )
 
-        model.N = N
-        model.g = g
-        model.alpha = alpha
 
-
-    def add_barotropic_flow(U=0.0, V=0.0):
+    def add_barotropic_flow(self, U=0.0, V=0.0):
         """ Add a barotropic flow to the initial condition. """
         
         if U != 0.0:

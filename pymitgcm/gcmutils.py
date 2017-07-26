@@ -33,9 +33,8 @@ def rungcm(rundir, builddir, inputdir):
             builddir), stdout=output, 
             stderr=subprocess.PIPE).communicate()
             
+    return stopmsg
 
-    if b'STOP NORMAL END' not in stopmsg:
-        print(stopmsg)
 
 
 
@@ -158,8 +157,56 @@ def compile(gcmdir, optfilename=None, npmake=1,
     make(npmake=npmake)
 
 
+def changesizevars(vars, sizedir='.'):
+    """Change a variable in the header file SIZE.h.
+        
+    Args:
+        vars (str): Name of the variable to be changed. This variable must be
+            contained in a small list of 'validvars'.
+        
+        sizedir (str): Path to the 'code' directory where the new SIZE.h will 
+            be saved.
+    """
 
-def changesize(var, value, codedir='.', origdir=None):
+    sizename = 'SIZE.h'
+    prespace = '     &           '
+    validvarnames = ['sNx', 'sNy', 'OLx', 'OLy', 'nSx', 'nSy', 
+        'nPx', 'nPy', 'Nr']
+
+    # Read file
+    with open('{}/{}'.format(sizedir, sizename), 'r') as sizefile:
+        sizelines = sizefile.readlines()
+
+    for varname, value in vars.items():
+
+        if varname not in validvarnames:
+            raise ValueError("The parameter 'varname' {} must be one of {}!".format(
+                varname, validvarnames))
+        elif type(value) is not int:
+            raise ValueError("The parameter 'value' must be an integer.")
+
+        # Overwrite the line in sizelines containing a non-commented
+        # and valid reference to 'var'
+        linenum = 0
+        for line in sizelines:
+            if (len(line) > 1 and 
+                line.lstrip()[0] is not 'C' and 
+                '{:<3s} ='.format(varname) in line):
+                if varname is 'Nr':
+                    sizelines[linenum] = '{}{:<3s} ={:>4d})\n'.format(
+                        prespace, varname, value)
+                else:
+                    sizelines[linenum] = '{}{:<3s} ={:>4d},\n'.format(
+                        prespace, varname, value)
+            linenum += 1
+
+    with open('{}/{}'.format(sizedir, sizename), 'w') as sizefile:
+        for line in sizelines:
+            sizefile.write(line)
+     
+
+
+def changesizevar(var, value, codedir='.', origdir=None):
     """Change a variable in the header file SIZE.h.
         
     Args:
@@ -264,8 +311,9 @@ def savegcminput(savevars, savedir='.'):
     savetype = '>f8'
 
     for savename in savevars.keys():
-        savevars[savename] = savevars[savename].astype(savetype) 
+        savevars[savename] = savevars[savename].squeeze().astype(savetype) 
         varshape = savevars[savename].shape
+
 
         with open('{}/{}'.format(savedir, savename), 'wb') as file:
 
@@ -582,9 +630,8 @@ def write_data_diagnostics(fields, freqs, levels,
 
 
 def truncate(a, digits=3):
-    """ Truncate the array "a" to an integer number of digits. """
-    atrunc = (np.round(a
-        / 10**(np.floor(np.log10(a))-digits))
-        * 10**(np.floor(np.log10(a))-digits))
-    return atrunc
-
+    """ Return the array a, truncated to a specified number of 
+    digits. """
+    return (np.round(a
+        / 10**np.floor(np.log10(np.abs(a)+1e-15)-digits))
+        * 10**np.floor(np.log10(np.abs(a)+1e-15)-digits))

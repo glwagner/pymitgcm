@@ -74,7 +74,7 @@ def sift_nested_dict(param, d, value=None):
     if param.lower() in d.keys():
         value = d[param]
     else: 
-        for k, v in d.iteritems():
+        for k, v in d.items():
             if isinstance(v, dict):
                 value = sift_nested_dict(param, v, value=value)
         
