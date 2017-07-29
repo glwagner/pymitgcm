@@ -9,17 +9,18 @@ import gentools
 # ----------------------------------------------------------------------------- 
 # ----------------------------------------------------------------------------- 
 # Prepare set up
-gcmdir  = '/Users/glwagner/Software/MITgcm'
-optfile = '{}/tools/build_options/neve'.format(gcmdir)
+#gcmdir  = '/Users/glwagner/Software/MITgcm'
+gcmdir  = '/data5/glwagner/Numerics/pymitgcm/MITgcm'
+optfile = '{}/tools/build_options/sverdrup_glwagner'.format(gcmdir)
 
 # Domain
 Lx = 13.3e3
 Ly = 5.0e3
 Lz = 200.0
 
-nx = 100
+nx = 200
 ny = 1
-nz = 100
+nz = 200
 
 # Run and make parallelism
 nprun  = 1
@@ -67,7 +68,8 @@ setupdirs = {
     'rundir'   : '{}/run'.format(workdir),
 }
 
-templdir = '/Users/glwagner/Numerics/gcmprocess/templates/leewave'
+#templdir = '/Users/glwagner/Numerics/gcmprocess/templates/leewave'
+templdir = '/data5/glwagner/Numerics/pymitgcm/templates/leewave'
 nametempldir = '{}/namelists'.format(templdir)
 codetempldir = '{}/code'.format(templdir)
 

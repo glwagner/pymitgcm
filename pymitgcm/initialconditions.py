@@ -52,6 +52,8 @@ class InitialCondition:
     def add_uvel(self, U):
         """ Add an eastward velocity to the initial condition. """ 
 
+        U = U*np.ones((self.nx, self.ny, self.nz))  # Broadcast to proper size
+
         if 'U' not in self.fields.keys():
             self.fields['U'] = U
         else:
@@ -60,6 +62,8 @@ class InitialCondition:
 
     def add_vvel(self, V):
         """ Add northward velocity of the initial condition. """ 
+
+        V = V*np.ones((self.nx, self.ny, self.nz))  # Broadcast to proper size
 
         if 'V' not in self.fields.keys():
             self.fields['V'] = V
@@ -71,6 +75,8 @@ class InitialCondition:
     def add_theta(self, T):
         """ Add potential temperature profile of the initial condition. """ 
 
+        T = T*np.ones((self.nx, self.ny, self.nz))  # Broadcast to proper size
+
         if 'T' not in self.fields.keys():
             self.fields['T'] = T
         else:
@@ -80,18 +86,20 @@ class InitialCondition:
     def add_salt(self, S):
         """ Add salinity profile of the initial condition. """
 
+        S = S*np.ones((self.nx, self.ny, self.nz))  # Broadcast to proper size
+
         if 'S' not in self.fields.keys():
             self.fields['S'] = S
         else:
             self.fields['S'] += S
 
 
-    def set_constant_stratification(self, N=1e-3, g=9.81, alpha=2e-3, T0=0.0):
+    def set_constant_stratification(self, N=1e-3, g=9.81, alpha=2e-4, T0=0.0):
         """ Set initial condition to a constant temperature stratification. """
 
         Tz = N**2.0 / (g*alpha) 
         T = Tz*self.model.z
-        T += T0
+        T += T0 - T.min()
 
         self.set_theta(
               np.ones((self.nx, self.ny))[:, :, np.newaxis]

@@ -37,8 +37,7 @@ class OpenBoundaryCondition:
         elif edge is 'east':
             self.n = model.y
             self.nn = model.ny
-            #self.I = (model.nx-1) * np.ones((model.ny,), dtype=np.int64)
-            self.I = model.nx * np.ones((model.ny,), dtype=np.int64)
+            self.I = (model.nx-1) * np.ones((model.ny,), dtype=np.int64)
             self.J = np.arange(0, model.ny)
 
 
@@ -96,11 +95,9 @@ class OpenBoundaryCondition:
             self.fields['S'] += S
 
 
-    def continue_ic(self, ic):
+    def copy_ic(self, ic):
         """ Continue an initial condition into the open boundary """
 
         for fieldname, field in ic.fields.items():
-            try:
-                self.fields[fieldname] = field[self.I, self.J, :].squeeze()
-            except:
-                self.fields[fieldname] = field[self.I-1, self.J, :].squeeze()
+            self.fields[fieldname] = field[self.I, self.J, :].squeeze()
+

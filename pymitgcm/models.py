@@ -1,15 +1,49 @@
 import os, shutil
+import os, time
 import numpy as np
-import time
 import f90nml
 
 from . import gcmutils
+from .initialconditions      import InitialCondition
+from .openboundaryconditions import OpenBoundaryCondition
 
+
+
+# Globals
+topofilename = 'topo.bin'
+validtemplatedirs = ['code', 'input', 'run']
+
+
+class Model:
+    def __init__(templatedir=None, gcmdir=None):
+
+        try:    self.gcmdir = os.path.abspath(gcmdir)
+        except: self.gcmdir = os.path.abspath('../MITgcm')
+
+        try: self.templatedir = os.path.abspath(templatedir)
+        except: pass
+
+        # Initialize namelist patch
+        self.namelists = {
+            'data': {
+                'parm01': {},       # Continuous equation
+                'parm03': {},       # Time-stepping
+                'parm04': {},       # Gridding
+                'parm05': {},       # Bathymetry initial condition files
+            },
+        }
+
+        # Convenience names for common namelists.
+        self.eqns  = self.namelists['data']['parm01']
+        self.grid  = self.namelists['data']['parm04']
+        self.files = self.namelists['data']['parm05']
+        self.timestepper = self.namelists['data']['parm03']
 
 
 
 class RectangularModel:
-    def __init__(self, nx, ny, nz, Lx, Ly, Lz, gcmdir=None):
+    def __init__(self, nx, ny, nz, Lx, Ly, Lz, gcmdir=None, 
+        templatedir=None):
         """ Instantiate a rectangular MITgcm model on a Cartesian grid. 
         
         Args:
@@ -25,13 +59,12 @@ class RectangularModel:
         self.Lx, self.Ly, self.Lz = Lx, Ly, Lz
         self.nx, self.ny, self.nz = nx, ny, nz
 
-        self.topofilename = 'topo.bin'
+        try:    self.gcmdir = os.path.abspath(gcmdir)
+        except: self.gcmdir = os.path.abspath('../MITgcm')
 
-        if gcmdir is None and os.path.exists('../MITgcm'):
-            self.gcmdir = os.path.abspath('../MITgcm')
-        else:
-            self.gcmdir = gcmdir
-
+        try: self.templatedir = os.path.abspath(templatedir)
+        except: pass
+            
         self.initgrid()
 
         # Initialize namelist patch
@@ -44,11 +77,13 @@ class RectangularModel:
             },
         }
 
-        # Some default names for bathymetry files
-        self.namelists['data']['parm04']['usingcartesiangrid'] = True
+        # Convenience names for common namelists.
+        self.eqns  = self.namelists['data']['parm01']
+        self.timestepper = self.namelists['data']['parm03']
+        self.grid  = self.namelists['data']['parm04']
+        self.files = self.namelists['data']['parm05']
 
-        # Convenience abbreviations
-        self.phys = self.namelists['data']['parm01']
+        self.grid['usingcartesiangrid'] = True
 
 
     def initgrid(self):
@@ -66,6 +101,18 @@ class RectangularModel:
         self.z = 0.5*(zf[0:-1] + zf[1:])
 
         self.Y, self.X = np.meshgrid(self.y, self.x)
+
+
+    def init_ic(self):
+        """ Initialize the model's initial condition. """
+        self.ic = InitialCondition(self)
+
+
+    def init_obcs(self, edges):
+        """ Initialize open boundary conditions. """
+        self.obcs = {}
+        for edge in edges:
+            self.obcs[edge] = OpenBoundaryCondition(self, edge)
 
 
     def set_thetaref(self, Tref=None):
@@ -87,7 +134,7 @@ class RectangularModel:
         if not hasattr(self, 'Tref'):
             self.Tref = np.zeros((self.nz,))
 
-        self.Tref = gcmutils.truncate(self.Tref, digits=5)
+        self.Tref = gcmutils.truncate(self.Tref, digits=4)
 
 
     def set_saltref(self, Sref=None):
@@ -111,6 +158,24 @@ class RectangularModel:
 
         self.Sref = gcmutils.truncate(self.Sref, digits=5)
 
+
+    def updatesizevars(self, nprun=None):
+        """ Push essential fields into the model's sizevars attribute. """
+
+        # Initialize
+        if nprun is None: nprun = 1
+        if not hasattr(self, 'sizevars'): self.sizevars = {}
+
+        # Vertical grid
+        self.sizevars['Nr'] = self.nz
+
+        # Parallelism
+        if self.nx % nprun == 0.0:
+            self.sizevars['sNx'] = int(self.nx/nprun)
+            self.sizevars['nSx'] = int(nprun)
+            self.sizevars['nPx'] = int(nprun)
+
+
     def updatenamelists(self):
         """ Push essential fields into the model's namelists attribute. """
 
@@ -119,23 +184,23 @@ class RectangularModel:
         if not hasattr(self, 'Sref'): self.set_saltref()
 
         # Update namepatch with required items...
-        self.namelists['data']['parm01']['Tref'] = list(self.Tref)
-        self.namelists['data']['parm01']['Sref'] = list(self.Sref)
+        if hasattr(self, 'Tref'): self.eqns['Tref'] = list(self.Tref)
+        if hasattr(self, 'Sref'): self.eqns['Sref'] = list(self.Sref)
 
-        self.namelists['data']['parm04']['delx'] = list(self.dx)
-        self.namelists['data']['parm04']['dely'] = list(self.dy)
-        self.namelists['data']['parm04']['delz'] = list(self.dz)
+        # TODO: detect properties of template setup and choose setup accordingly.
+        #self.grid['delx'] = list(self.dx)
+        #self.grid['dely'] = list(self.dy)
+        #self.grid['delz'] = list(self.dz)
 
         # Names of the topography file
         if hasattr(self, 'topo'):
-            self.namelists['data']['parm05']['bathyfile'] = self.topofilename
+            self.files['bathyfile'] = topofilename
 
         # Names of the binary files that specify initial conditions
         if hasattr(self, 'ic'):
             for var in self.ic.fields.keys():
-                self.namelists['data']['parm05'][
-                    self.ic.namelistnames[var]] = (self.ic.filenames[var])
-
+                self.files[self.ic.namelistnames[var]] = self.ic.filenames[var]
+                    
         if hasattr(self, 'obcs'):
             self.namelists['data.pkg'] = { 'packages': { 'useobcs': True } }
             self.namelists['data.obcs'] = { 'obcs_parm01' : {} }
@@ -145,8 +210,8 @@ class RectangularModel:
                 if obc is 'east' or obc is 'west':      idx = 'I'
                 elif obc is 'south' or obc is 'north':  idx = 'J'
 
-                self.namelists['data.obcs']['obcs_parm01'][
-                    'ob_'+idx+obc] = list(getattr(self.obcs[obc], idx))
+                #self.namelists['data.obcs']['obcs_parm01'][
+                #    'ob_'+idx+obc] = list(getattr(self.obcs[obc], idx))
 
                 for var in self.obcs[obc].fields.keys():
                     self.namelists['data.obcs']['obcs_parm01'][
@@ -158,25 +223,22 @@ class RectangularModel:
         """ Save available grid files, initial conditions, and boundary 
         conditions to disk. """
 
-
         # Topography
         if hasattr(self, 'topo'):
-            topovar = { self.topofilename : self.topo }
-            gcmutils.savegcminput(topovar, self.setupdirs['inputdir'])
+            topovar = { topofilename : self.topo }
+            gcmutils.savegcminput(topovar, self.setupdirs['input'])
 
         # Initial condition and boundary conditions
         if hasattr(self, 'ic'):
-            self.ic.save(self.setupdirs['inputdir'])
+            self.ic.save(self.setupdirs['input'])
 
         if hasattr(self, 'obcs'):
             for obc in self.obcs.keys():
-                self.obcs[obc].save(self.setupdirs['inputdir'])
-
-
+                self.obcs[obc].save(self.setupdirs['input'])
 
 
     def gensetup(self, namepatch=None, nprun=1, templatedir=None, 
-        workdir=None, cleansetup=False):
+        setupdir=None, cleansetup=False):
         """ Generate the MITgcm setup for the process model using a template
         setup.
 
@@ -191,55 +253,59 @@ class RectangularModel:
                 /namelist and /code subdirectories. If 'None', defaults to 
                 the attribute self.templatedir, which must exist.
 
-            workdir (str): Path to the working directory in which to put
+            setupdir (str): Path to the working directory in which to put
                 the setup.
 
             cleansetup (bool): Boolean indicating whether to erase an
                 existing setup.
         """
 
-        if self.nx % nprun != 0:
-            raise ValueError("Number of grid points must be a mulitple of the "
-                "number of run processes.")
-
-        # Initialization: save inputs and patch the model's namelist
-        self.initsetupdirs(workdir=workdir, cleansetup=cleansetup)
-        self.saveinput()
-        self.updatenamelists()
         if namepatch is not None: 
             self.namelists = {**namepatch, **self.namelists}
 
-        # Identify templatedir and daughter code and namelist dirs
-        if templatedir is None: templatedir = self.templatedir
-        nametempldir = '{}/namelists'.format(templatedir)
-        codetempldir = '{}/code'.format(templatedir)
+        if templatedir is not None: 
+            self.templatedir = os.path.abspath(templatedir)
+        elif not hasattr(self, 'templatedir'):
+            self.templatedir = os.getcwd()
 
-        # Copy code
-        for filename in os.listdir(codetempldir):
-            shutil.copy('{}/{}'.format(codetempldir, filename),
-                '{}/{}'.format(self.setupdirs['codedir'], filename))
+        if self.nx % nprun != 0:
+            raise ValueError("Number of grid points must be a mulitple of the "
+                "number of run processes.")
+        else:
+            self.nprun = nprun
+
+        # Initialization: save inputs and patch the model's namelist
+        template = {}
+        for dir in validtemplatedirs:
+            daughterdir = os.path.abspath('{}/{}'.format(self.templatedir, dir))
+            if os.path.exists(daughterdir):
+                template[dir] = daughterdir
+
+        if len(template.keys()) is 0:
+            raise RuntimeError("Template is either empty or does not exist.")
+
+        self.initsetupdirs(setupdir=setupdir, cleansetup=cleansetup)
+        self.saveinput()
+        self.updatenamelists()
+        self.updatesizevars(nprun=nprun)
+            
+        # Copy template
+        for dir in template.keys():
+            for filename in os.listdir(template[dir]):
+                shutil.copy('{}/{}'.format(template[dir], filename),
+                    '{}/{}'.format(self.setupdirs[dir], filename))
 
         # Modify SIZE.h
-        gcmutils.changesizevars(
-            {'sNx': int(self.nx/nprun), 
-             'Nr' : self.nz,
-             'nPx': nprun }, sizedir=self.setupdirs['codedir'])
+        gcmutils.changesizevars(self.sizevars, sizedir=self.setupdirs['code'])
 
-        #for var, value in sizevars.items():
-        #gcmutils.changesizevar(var, value, codedir=self.setupdirs['codedir'])
-
-        # Direct copy namelists not in the model namelist dictionary
-        for filename in os.listdir(nametempldir):
-            if filename not in self.namelists.keys():
-                shutil.copy('{}/{}'.format(nametempldir, filename), 
-                    '{}/{}'.format(self.setupdirs['inputdir'], filename)) 
-
-        # Merge remaining template namelists with model namelist
+        # Merge template namelists with model namelist
         fullnamelists = {}
         for nmlfile in self.namelists.keys():
 
+            # Load namelist files from template directory, not newly-created
+            # setup
             fullnamelists[nmlfile] = f90nml.read('{}/{}'.format(
-                nametempldir, nmlfile))
+                template['input'], nmlfile))
 
             for nml in self.namelists[nmlfile].keys():
                 for var in self.namelists[nmlfile][nml].keys():
@@ -248,33 +314,28 @@ class RectangularModel:
 
         # Save namelists
         for filename in fullnamelists.keys():
-            savename = '{}/{}'.format(self.setupdirs['inputdir'], filename)
+            savename = '{}/{}'.format(self.setupdirs['input'], filename)
             with open(savename, 'w') as namefile:
                 fullnamelists[filename].write(savename, force=True)
 
 
 
-    def initsetupdirs(self, workdir=None, cleansetup=False):
+    def initsetupdirs(self, setupdir=None, cleansetup=False):
         """ Initialize the directory structure of a pymitgcm setup. """
 
-        if workdir is None:
-            if hasattr(self, 'setupdirs'):
-                workdir = self.setupdirs['workdir']
-            else:
-                workdir = os.path.abspath('.')
+        if setupdir is None: setupdir = os.getcwd()
 
         setupdirs = { 
-            'workdir'  : workdir,
-            'builddir' : '{}/build'.format(workdir),
-            'codedir'  : '{}/code'.format(workdir),
-            'inputdir' : '{}/input'.format(workdir),
-            'rundir'   : '{}/run'.format(workdir),
+            'build' : os.path.join(setupdir, 'build'),
+            'code'  : os.path.join(setupdir, 'code'),
+            'input' : os.path.join(setupdir, 'input'),
+            'run'   : os.path.join(setupdir, 'run'),
         }
 
         if cleansetup:
             # Remove and remake paths.
             for dir, path in setupdirs.items():
-                if dir is not 'workdir' and os.path.exists(path):
+                if dir is not 'base' and os.path.exists(path):
                     shutil.rmtree(path)
 
         # Make directories if they don't exist
@@ -285,24 +346,39 @@ class RectangularModel:
         self.setupdirs = setupdirs
 
 
-    def run(self):
+    def run(self, clean=False):
         """ Run the model. """
 
         starttime = time.time()
-        msg = gcmutils.rungcm(self.setupdirs['rundir'], 
-            self.setupdirs['builddir'], self.setupdirs['inputdir'])
-        print('Run time: {:.3f}'.format(time.time() - starttime))
 
+        msg = gcmutils.rungcm(
+                       self.setupdirs['run'], 
+            inputdir = self.setupdirs['input'],
+            clean=clean)
+
+        print('Run time: {:.3f}'.format(time.time() - starttime))
         print(msg.decode('utf-8'))    
 
 
-    def compile(self, optfilename=None, npmake=1, nprun=1):
-        """ Compile the model. """
+    def compile(self, optfilename=None, npmake=1):
+        """ Compile the model. 
+    
+        Args:
+            optfilename (str): Name of the optfile to use with genmake2
+            npmake (int): Number of processors to use during compilation
+            nprun (int): Number of processors the model will be run with. Used
+                to determine whether or not to compile the model with
+                mpi enabled.
+            mpi (bool): An flag alternative to specifying nprun that directs
+                genmake2 to compile with mpi enabled.
+        """
 
-        if nprun > 1:   mpi = True
-        else:           mpi = False
+        # The setup filestructure and setupdirs attribute must be 
+        # initialized to compile the model.
+        os.chdir(self.setupdirs['build'])
 
-        os.chdir(self.setupdirs['builddir'])
+        if self.nprun > 1: mpi=True
+        else:              mpi=False
             
         starttime = time.time()
         gcmutils.genmake(self.gcmdir, optfilename=optfilename, mpi=mpi)
@@ -315,3 +391,7 @@ class RectangularModel:
         starttime = time.time()
         gcmutils.make(npmake=npmake)
         print('Make time: {:3f} s'.format(time.time()-starttime))
+
+        # Copy executable to run directory
+        shutil.copy(os.path.join(self.setupdirs['build'], 'mitgcmuv'),
+            os.path.join(self.setupdirs['run'], ''))

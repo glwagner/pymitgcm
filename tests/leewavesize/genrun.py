@@ -9,18 +9,19 @@ import gentools
 # ----------------------------------------------------------------------------- 
 # ----------------------------------------------------------------------------- 
 # Prepare set up
-#gcmdir  = '/Users/glwagner/Software/MITgcm'
-gcmdir  = '/data5/glwagner/Numerics/pymitgcm/MITgcm'
-optfile = '{}/tools/build_options/sverdrup_glwagner'.format(gcmdir)
+gcmdir  = '/Users/glwagner/Software/MITgcm'
+#gcmdir  = '/data5/glwagner/Numerics/pymitgcm/MITgcm'
+#optfile = '{}/tools/build_options/sverdrup_glwagner'.format(gcmdir)
+optfile = '{}/tools/build_options/neve'.format(gcmdir)
 
 # Domain
 Lx = 13.3e3
 Ly = 5.0e3
 Lz = 200.0
 
-nx = 200
+nx = 100
 ny = 1
-nz = 200
+nz = 100
 
 # Run and make parallelism
 nprun  = 1
@@ -40,6 +41,8 @@ z = np.arange(-0.5*dz, -Lz, -dz)
 # Stratification
 Tz = N**2.0 / (g*alpha)
 Tref = Tz*z - (Tz*z).mean()
+
+compiling = False
 
 # Initial temperature profile
 init_T = np.ones((nx,))[:, np.newaxis] * Tref[np.newaxis, :]
@@ -68,18 +71,19 @@ setupdirs = {
     'rundir'   : '{}/run'.format(workdir),
 }
 
-#templdir = '/Users/glwagner/Numerics/gcmprocess/templates/leewave'
-templdir = '/data5/glwagner/Numerics/pymitgcm/templates/leewave'
+templdir = '/Users/glwagner/Numerics/pymitgcm/templates/leewave'
+#templdir = '/data5/glwagner/Numerics/pymitgcm/templates/leewave'
 nametempldir = '{}/namelists'.format(templdir)
 codetempldir = '{}/code'.format(templdir)
 
 # Remove and remake paths.
-for path in setupdirs.values():
-    if os.path.exists(path):
-        shutil.rmtree(path)
+#for path in setupdirs.values():
+#    if os.path.exists(path):
+#        shutil.rmtree(path)
 
 for path in setupdirs.values():
-    os.makedirs(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 # ----------------------------------------------------------------------------- 
 # ----------------------------------------------------------------------------- 
@@ -108,16 +112,17 @@ patches = {
         'parm01': {
             'Tref'    : list(np.round(Tref*100)/100),
             #'Sref'    : [ 35.0 for i in range(nz) ],
-            'viscAz'  : 2.0e-3,
-            'viscAh'  : 1.0e-2,
+            'viscAz'  : 1.0e-2,
+            'viscAh'  : 1.0e-1,
             'diffKhT' : 1.0e-2,
             'diffKzT' : 1.0e-3,
         },
         'parm03': {
-            'nTimeSteps' : 10000,
-            'deltaT'     : 100.0,
-            'pChkptFreq' : 100000.0,
-            'chkptFreq'  : 100000.0,
+            'nTimeSteps' : 1000,
+            'deltaT'     : 50.0,
+            'pChkptFreq' : 1000.0,
+            'chkptFreq'  : 1000.0,
+            'dumpfreq'   : 100.0,
         },
         'parm04': {
             'delZ'       : [ round(dz, 3) for i in range(nz) ],
@@ -173,84 +178,92 @@ gentools.convert_and_save(
 
 # ----------------------------------------------------------------------------- 
 # ----------------------------------------------------------------------------- 
-# Compile
-if nprun > 1:
-    compilecmd = [
-        "{}/tools/genmake2".format(gcmdir),
-            "-optfile={}".format(optfile),
-        "-enable=mnc",
-        "-mpi",
-        "-mods=../code/",
-        "-rootdir={}".format(gcmdir),
-    ]
-else:
-    compilecmd = [ 
-        "{}/tools/genmake2".format(gcmdir),
-            "-optfile={}".format(optfile),
-        "-enable=mnc",
-        "-mods=../code/",
-        "-rootdir={}".format(gcmdir),
-    ]
+if compiling:
 
-# Genmake and make
-os.chdir(setupdirs['builddir'])
+    if nprun > 1:
+        compilecmd = [
+            "{}/tools/genmake2".format(gcmdir),
+                "-optfile={}".format(optfile),
+            "-enable=mnc",
+            "-mpi",
+            "-mods=../code/",
+            "-rootdir={}".format(gcmdir),
+        ]
+    else:
+        compilecmd = [ 
+            "{}/tools/genmake2".format(gcmdir),
+                "-optfile={}".format(optfile),
+            "-enable=mnc",
+            "-mods=../code/",
+            "-rootdir={}".format(gcmdir),
+        ]
 
-starttime = time.time()
-with open('out_genmake2.txt', 'w') as genmakeout:
-    with open('err_genmake2.txt', 'w') as genmakeerr:
-        process = subprocess.call(compilecmd, stdout=genmakeout, stderr=genmakeerr)
-print('Genmake time: {:3f} s'.format(time.time()-starttime))
+    # Genmake and make
+    os.chdir(setupdirs['builddir'])
 
-if process is not 0:
-    with open('err_genmake2.txt', 'r') as errfile:
-        for line in errfile:
-            print(line.rstrip('\n'))
-    raise RuntimeError('Genmake2 failed.')
+    starttime = time.time()
+    with open('out_genmake2.txt', 'w') as genmakeout:
+        with open('err_genmake2.txt', 'w') as genmakeerr:
+            process = subprocess.call(compilecmd, stdout=genmakeout, 
+                stderr=genmakeerr)
+    print('Genmake time: {:3f} s'.format(time.time()-starttime))
 
-starttime = time.time()
-with open('out_makedepend.txt', 'w') as makedependout:
-    with open('err_makedepend.txt', 'w') as makedependerr:
-        process = subprocess.call(['make', 'depend'], 
-            stdout=makedependout, stderr=makedependerr)
-print('Make depend time: {:3f} s'.format(time.time()-starttime))
+    if process is not 0:
+        with open('err_genmake2.txt', 'r') as errfile:
+            for line in errfile:
+                print(line.rstrip('\n'))
+        raise RuntimeError('Genmake2 failed.')
 
-if process is not 0:
-    with open('err_makedepend.txt', 'r') as errfile:
-        for line in errfile:
-            print(line.rstrip('\n'))
-    raise RuntimeError('make depend failed.')
+    starttime = time.time()
+    with open('out_makedepend.txt', 'w') as makedependout:
+        with open('err_makedepend.txt', 'w') as makedependerr:
+            process = subprocess.call(['make', 'depend'], 
+                stdout=makedependout, stderr=makedependerr)
+    print('Make depend time: {:3f} s'.format(time.time()-starttime))
 
-starttime = time.time()
-with open('out_make.txt', 'w') as makeout:
-    with open('err_make.txt', 'w') as makeerr:
-        process = subprocess.call(['make', '-j{}'.format(npmake)], 
-            stdout=makeout, stderr=makeerr)
-print('Make time: {:3f} s'.format(time.time()-starttime))
+    if process is not 0:
+        with open('err_makedepend.txt', 'r') as errfile:
+            for line in errfile:
+                print(line.rstrip('\n'))
+        raise RuntimeError('make depend failed.')
 
-if process is not 0:
-    with open('err_make.txt', 'r') as errfile:
-        for line in errfile:
-            print(line.rstrip('\n'))
-    raise RuntimeError('make failed.')
+    starttime = time.time()
+    with open('out_make.txt', 'w') as makeout:
+        with open('err_make.txt', 'w') as makeerr:
+            process = subprocess.call(['make', '-j{}'.format(npmake)], 
+                stdout=makeout, stderr=makeerr)
+    print('Make time: {:3f} s'.format(time.time()-starttime))
+
+
+    if process is 0:
+        # Make succeeded: copy executable to run directory.
+        shutil.copy(os.path.join(setupdirs['builddir'], 'mitgcmuv'),
+            os.path.join(setupdirs['rundir'], ''))
+    else:
+        with open('err_make.txt', 'r') as errfile:
+            for line in errfile:
+                print(line.rstrip('\n'))
+        raise RuntimeError('make failed.')
 
 # ----------------------------------------------------------------------------- 
 # ----------------------------------------------------------------------------- 
 # Run
-for filename in os.listdir(setupdirs['rundir']):
-    os.remove('{}/{}'.format(setupdirs['rundir'], filename))
+#for filename in os.listdir(setupdirs['rundir']):
+#    os.remove('{}/{}'.format(setupdirs['rundir'], filename))
 
 for filename in os.listdir(setupdirs['inputdir']):
-    os.symlink(
-        '{}/{}'.format(setupdirs['inputdir'], filename),
-        '{}/{}'.format(setupdirs['rundir'], filename) 
-    )
+    os.remove(os.path.join(setupdirs['rundir'], filename))
+    os.symlink(os.path.join(setupdirs['inputdir'], filename), 
+        os.path.join(setupdirs['rundir'], filename))
+
 os.chdir(setupdirs['rundir'])
 
 starttime = time.time()
 with open('./output.txt', 'w') as output:
-    _, stopmsg = subprocess.Popen('{}/mitgcmuv'.format(setupdirs['builddir']), 
+    _, stopmsg = subprocess.Popen('./mitgcmuv', 
         stdout=output, stderr=subprocess.PIPE).communicate()
+        
 print('Run time: {:.3f}'.format(time.time() - starttime))
 
-if 'STOP NORMAL END' not in stopmsg:
-    print(stopmsg)
+if b'STOP NORMAL END' not in stopmsg:
+    print(stopmsg.decode('utf-8'))

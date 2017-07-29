@@ -1,218 +1,10 @@
 import os
 import numpy as np
-import time, subprocess
-
-
-
-def rungcm(rundir, builddir=None, inputdir=None, clean=False):
-    """ Run a compiled MITgcm model.
-        
-    Args:
-        rundir (str): Path the directory in which to run the model.
-
-        builddir (str): Path to directory that contains the executable 
-            'mitgcmuv'. Assumes rundir if unset.
-
-        inputdir (str): Path to the directory that contains input 
-            namelists and binary files. 
-
-        clean (bool): Whether or not to clean the run directory prior 
-            to model execution.
-    """
-
-    rundir = os.path.abspath(rundir)
-    os.chdir(rundir)
-
-    if builddir is None: builddir=rundir
-
-    if inputdir is not None: 
-        for filename in os.listdir(inputdir):
-            os.symlink(os.path.join(inputdir, filename),
-                os.path.join(rundir, filename))
-
-    if clean:
-        for filename in os.listdir(rundir):
-            os.remove(os.path.join(rundir, filename))
-
-    with open('./output.txt', 'w') as output:
-        _, stopmsg = subprocess.Popen(os.path.join(builddir, 'mitgcmuv'), 
-            stdout=output, stderr=subprocess.PIPE).communicate()
-            
-    return stopmsg
 
 
 
 
-
-def genmake(gcmdir, optfilename=None, mpi=False, mnc=True, builddir=None):
-    """ Execute MITgcm's 'genmake2' with appropriate compile options in the 
-    build directory.
-    
-    Args:
-        gcmdir (str): Path to MITgcm.
-
-        optfilename (str): Name of the optfile. Must be an optfile in 
-            gcmdir/tools/build_options.
-
-        mpi (bool): Whether or not to compile with mpi enabled.
-
-        mnc (bool): Whether or not to compile with NetCDF enabled.
-
-        builddir (str): Directory in which to initiate the build.
-    """
-
-    # Change directories if specified
-    if builddir is not None: os.chdir(builddir)
-
-    # Generate compile command
-    compilecmd = ["{}/tools/genmake2".format(gcmdir)]
-    options = {}
-
-    options['mods']    = "-mods=../code/"
-    options['rootdir'] = "-rootdir={}".format(gcmdir)
-
-    if mnc: options['mnc'] = "-enable=mnc"
-    if mpi: options['mpi'] = "-mpi"
-        
-    if optfilename is not None:
-        optfile = os.path.join(gcmdir, 'tools', 'build_options', optfilename)
-        if os.path.exists(optfile):
-            options['optfile'] = "-optfile={}".format(optfile)
-
-    for opt in options.values():
-        compilecmd.append(opt)
-
-    with open('out_genmake2.txt', 'w') as genmakeout:
-        with open('err_genmake2.txt', 'w') as genmakeerr:
-            process = subprocess.call(compilecmd, stdout=genmakeout, 
-                stderr=genmakeerr)
-
-    if process is not 0:
-        with open('err_genmake2.txt', 'r') as errfile:
-            for line in errfile:
-                print(line.rstrip('\n'))
-        raise RuntimeError('Genmake2 failed.')
-
-
-def makedepend(builddir=None):
-    """ Execute 'make depend' in a build directory. 'genmake2' must be
-    successfully executed in the directory prior to running this command.
-
-    Args:
-        builddir (str): Build directory where genmake2 was run. If unset
-            the current directory is assumed.
-    """ 
-
-    if builddir is not None: os.chdir(builddir)
-
-    with open('out_makedepend.txt', 'w') as makedependout:
-        with open('err_makedepend.txt', 'w') as makedependerr:
-            process = subprocess.call(['make', 'depend'],
-                stdout=makedependout, stderr=makedependerr)
-
-    if process is not 0:
-        with open('err_makedepend.txt', 'r') as errfile:
-            for line in errfile:
-                print(line.rstrip('\n'))
-        raise RuntimeError('make depend failed.')
-
-
-def make(npmake=1, builddir=None):
-    """ 
-        npmake (int): Number of processors to use for compilation.
-    """
-
-    if builddir is not None: os.chdir(builddir)
-
-    with open('out_make.txt', 'w') as makeout:
-        with open('err_make.txt', 'w') as makeerr:
-            process = subprocess.call(['make', '-j{}'.format(npmake)],
-                stdout=makeout, stderr=makeerr)
-
-    if process is not 0:
-        with open('err_make.txt', 'r') as errfile:
-            for line in errfile:
-                print(line.rstrip('\n'))
-        raise RuntimeError('make failed.')
-
-
-def compile(gcmdir, optfilename=None, npmake=1,
-    mpi=False, mnc=True, builddir=None):
-    """ Compile an MITgcm setup using genmake2, make depend, and make. 
-    
-    Args:
-        gcmdir (str): Path to MITgcm.
-
-        optfilename (str): Name of the optfile. Must be an optfile in 
-            gcmdir/tools/build_options.
-
-        npmake (int): Number of processors to use for compilation.
-
-        mpi (bool): Whether or not to compile with mpi enabled.
-
-        mnc (bool): Whether or not to compile with NetCDF enabled.
-
-        builddir (str): Directory in which to initiate the build.
-    """
-
-    if builddir is not None: os.chdir(builddir)
-
-    genmake(self.gcmdir, optfilename=optfilename, mpi=mpi, mnc=mnc)
-    makedepend()
-    make(npmake=npmake)
-
-
-def changesizevars(vars, sizedir='.'):
-    """Change a variable in the header file SIZE.h.
-        
-    Args:
-        vars (str): Name of the variable to be changed. This variable must be
-            contained in a small list of 'validvars'.
-        
-        sizedir (str): Path to the 'code' directory where the new SIZE.h will 
-            be saved.
-    """
-
-    sizename = 'SIZE.h'
-    prespace = '     &           '
-    validvarnames = ['sNx', 'sNy', 'OLx', 'OLy', 'nSx', 'nSy', 
-        'nPx', 'nPy', 'Nr']
-
-    # Read file
-    with open(os.path.join(sizedir, sizename), 'r') as sizefile:
-        sizelines = sizefile.readlines()
-
-    for varname, value in vars.items():
-
-        if varname not in validvarnames:
-            raise ValueError("The parameter 'varname' {} must be one of "
-                "{}!".format(
-                varname, validvarnames))
-        elif type(value) is not int:
-            raise ValueError("The parameter 'value' must be an integer.")
-
-        # Overwrite the line in sizelines containing a non-commented
-        # and valid reference to 'var'
-        linenum = 0
-        for line in sizelines:
-            if (len(line) > 1 and 
-                line.lstrip()[0] is not 'C' and 
-                '{:<3s} ='.format(varname) in line):
-                if varname is 'Nr':
-                    sizelines[linenum] = '{}{:<3s} ={:>4d})\n'.format(
-                        prespace, varname, value)
-                else:
-                    sizelines[linenum] = '{}{:<3s} ={:>4d},\n'.format(
-                        prespace, varname, value)
-            linenum += 1
-
-    with open(os.path.join(sizedir, sizename), 'w') as sizefile:
-        for line in sizelines:
-            sizefile.write(line)
-     
-
-
-def changesizevar(var, value, codedir='.', origdir=None):
+def change_size_var(var, value, codedir='.', origdir=None):
     """Change a variable in the header file SIZE.h.
         
     Args:
@@ -223,13 +15,10 @@ def changesizevar(var, value, codedir='.', origdir=None):
             is always associated with some aspect of the grid size, it must 
             be an integer.
 
-        codedir (str): Path to the 'code' directory where the new SIZE.h will 
-            be saved.
+        codedir (str): Path to the 'code' directory where SIZE.h is to be kept.
 
-        origdir (str): Path to the template directory with an original copy of 
-            SIZE.h. If this path is not specified, origdir is set to codedir.
-            
-            
+        origdir (str): Path to the template directory where an example SIZE.h
+            is kept.
     """
 
     sizename = 'SIZE.h'
@@ -251,7 +40,7 @@ def changesizevar(var, value, codedir='.', origdir=None):
         os.makedirs(codedir)
 
     # Read file
-    with open(os.path.join(origdir, sizename), 'r') as sizefile: 
+    with open('{}/{}'.format(origdir, sizename), 'r') as sizefile:
         sizelines = sizefile.readlines()
 
     linenum = 0
@@ -259,15 +48,15 @@ def changesizevar(var, value, codedir='.', origdir=None):
         if (len(line) > 1 and 
             line.lstrip()[0] is not 'C' and 
             '{:<3s} ='.format(var) in line):
-            if var is 'Nr':
-                sizelines[linenum] = '{}{:<3s} ={:>4d})\n'.format(
+            if var is not 'Nr':
+                sizelines[linenum] = '{}{:<3s} ={:>4d},\n'.format(
                     prespace, var, value)
             else:
-                sizelines[linenum] = '{}{:<3s} ={:>4d},\n'.format(
+                sizelines[linenum] = '{}{:<3s} ={:>4d})\n'.format(
                     prespace, var, value)
         linenum += 1
 
-    with open(os.path.join(codedir, sizename), 'w') as sizefile:
+    with open('{}/{}'.format(codedir, sizename), 'w') as sizefile:
         for line in sizelines:
             sizefile.write(line)
             
@@ -280,13 +69,13 @@ def get_namelist_param(param, nmldir='.'):
     # Read namelists
     namefile = {}
     for filename in os.listdir(nmldir):
-        namefiles[filename] = f90nml.read(os.path.join(nmldir, filename))
+        namefiles[filename] = f90nml.read('{}/{}'.format(nmldir, filename))
 
     # Sift namelists to find param
     return sift_nested_dict(param, namefiles)
     
 
-def siftdict(param, d, value=None):
+def sift_nested_dict(param, d, value=None):
     """Sift recurively through a nested dictionary in search of 
     the key 'param' and either return its value or throw an error."""
 
@@ -302,12 +91,12 @@ def siftdict(param, d, value=None):
 
     
 
-def savegcminput(savevars, savedir='.'):
+def convert_and_save(vars, savedir='.'):
     """Convert and save variables in proper format for input into
     MITgcm.
 
     Args:
-        savevars (dict): A dictionary of variables in the form savename: var.
+        vars (dict):    A dictionary of variables.
         
         savedir (str):  A string specifying the directory in which to save
             the binary files.
@@ -316,23 +105,16 @@ def savegcminput(savevars, savedir='.'):
     # Convert variables to big endian, double precision for saving.
     savetype = '>f8'
 
-    for savename in savevars.keys():
+    for var in vars.keys():
+        vars[var] = vars[var].astype(savetype) 
+        varshape = vars[var].shape
 
-        savevars[savename] = savevars[savename].astype(savetype) 
-        varshape = savevars[savename].shape
-
-        with open(os.path.join(savedir, savename), 'wb') as file: 
+        with open('{}/{}.bin'.format(savedir, var), 'wb') as file:
             if len(varshape) is 1:
-                savevars[savename].tofile(file)            
-
+                vars[var].tofile(file)            
             elif len(varshape) is 2:
                 for k in range(varshape[1]):
-                    savevars[savename][:, k].tofile(file)
-
-            elif len(varshape) is 3:
-                for k in range(varshape[2]):
-                    for l in range(varshape[1]):
-                        savevars[savename][:, l, k].tofile(file)
+                    vars[var][:, k].tofile(file)
 
 
 def get_diag_list_header():
@@ -341,7 +123,7 @@ def get_diag_list_header():
 
     header = (
         "# Diagnostic Package Choices\n"
-        "#-------------------------------------------------------------------\n"
+        "#--------------------------------------------------------------------\n"
         "# for each output-stream:\n"
         "#\n"
         "#  filename(n) : prefix of the output file name (only 8.c long) \n"
@@ -360,7 +142,7 @@ def get_diag_list_header():
         "#      (see 'available_diagnostics' file for the list of all\n"
         "#      available diag. in this particular config)\n"
         "#\n"                 
-        "#-------------------------------------------------------------------"
+        "#--------------------------------------------------------------------"
     )
 
     return header
@@ -372,18 +154,17 @@ def get_diag_stat_header():
 
     header = (
         "# Parameter for Diagnostics of per level statistics:\n"
-        "#-------------------------------------------------------------------\n"
+        "#--------------------------------------------------------------------\n"
         "# for each output-stream:\n"
         "#\n"
         "#  stat_fname(n) : prefix of the output file name (only 8.c long) \n"
-        "#      for outp.stream n\n"
+        "#  for outp.stream n\n"
         "#\n"
-        "#  stat_freq(n):< 0 : write snap-shot output every |stat_freq| \n"
-        "#                     seconds\n"
+        "#  stat_freq(n):< 0 : write snap-shot output every |stat_freq| seconds\n"
         "#               > 0 : write t-average output every stat_freq seconds\n"
         "#\n"
         "#  stat_phase(n)    : write at time = stat_phase + multiple of \n"
-        "#                     |stat_freq|\n"
+        "#      |stat_freq|\n"
         "#\n"
         "#  stat_region(:,n) : list of 'regions' (deft: 1 region only=global)\n"
         "#\n"
@@ -449,13 +230,11 @@ def replace_namelist_param(namepath, params, savepath='.'):
         for line in namelist:
             line = line.lstrip()
             if len(line) > 0:
-                if (line[0] not in endchars and 
-                    paramname in line and 
-                    '=' in line):
+                if line[0] not in endchars and paramname in line and '=' in line:
                     if paramline is not None:
                         raise RuntimeError("Two lines have been found that \n"
-                            "contain the parameter name, the equals sign \n"
-                            "'=', and do not appear to be a comment. Check \n"
+                            "contain the parameter name, the equals sign '=', \n"
+                            "and do not appear to be a comment. Check \n"
                             "the input data file and remove the duplicate or "
                             "otherwise offensive line.")
                     else:
@@ -526,14 +305,13 @@ def replace_namelist_param(namepath, params, savepath='.'):
                 namefile.write(line)
 
     # Save the file
-    newnamepath = os.path.join(savepath, os.path.basename(namepath))
+    newnamepath = '{}/{}'.format(savepath, os.path.basename(namepath))
     with open(newnamepath, 'w') as newnamefile:
         for line in newnamelist:
            newnamefile.write(line) 
 
 
-def write_data_diagnostics(fields, freqs, levels, 
-    savepath='.', overwrite=False):
+def write_data_diagnostics(fields, freqs, levels, savepath='.', overwrite=False):
     """ Write a diagnostics file for MITgcm diagnostics.
     Each diagnostic is defined by a list of field names, frequency
     of output, vertical levels in the case of 3D diagnostics, and a 
@@ -550,24 +328,23 @@ def write_data_diagnostics(fields, freqs, levels,
 
         savepath (str)   : Path in which to save output.
 
-        overwrite (bool) : Flag to indicate whether or not to overwrite 
-            an existing file at savepath.
+        overwrite (bool) : Flag to indicate whether or not to overwrite an existing
+            file at savepath.
     """
                 
     # Parameters
     levelLinewidth = 10
     fieldLinewidth = 3
-    diagfilename = os.path.join(savedir, 'data.diagnostics')
+    diagFilename = "{}/data.diagnostics".format(savedir)
     ndiags = len(fields.keys())
 
     # Check to see if file exists
-    if os.path.isfile(diagfilename):
+    if os.path.isfile(diagFilename):
         if overwrite:
-            os.remove(diagfilename)
+            os.remove(diagFilename)
         else:
             raise ValueError("File {} exists! "
-                    "Either delete it or set overwrite=True.".format(
-                    diagfilename))
+                    "Either delete it or set overwrite=True.".format(diagFilename))
 
     # Header to the diagnostics_list namelist
     listheader = get_diag_list_header()
@@ -634,9 +411,7 @@ def write_data_diagnostics(fields, freqs, levels,
         diagfile.write(fulldiagtext)
 
 
-def truncate(a, digits=3):
-    """ Return the array a, truncated to a specified number of 
-    digits. """
-    return np.round(np.round(a
-        / 10**np.floor(np.log10(np.abs(a)+1e-15)-digits))
-        * 10**np.floor(np.log10(np.abs(a)+1e-15)-digits), 14)
+
+
+
+

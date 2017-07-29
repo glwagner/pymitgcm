@@ -1,0 +1,31 @@
+
+GENMAKE :
+
+A program for GENerating MAKEfiles for the MITgcm project.
+   For a quick list of options, use "genmake2 -h"
+or for more detail see the Developer's HOWTO manual at:
+   http://mitgcm.org/public/docs.html
+
+===  Processing options files and arguments  ===
+  getting local config information:  none found
+  getting OPTFILE information:
+    using OPTFILE="/Users/glwagner/Software/MITgcm/tools/build_options/neve"
+  getting AD_OPTFILE information:
+    using AD_OPTFILE="/Users/glwagner/Software/MITgcm/tools/adjoint_options/adjoint_default"
+  check makedepend (local: 0, system: 0, 0)
+
+===  Checking system libraries  ===
+  Do we have the system() command using gfortran...  yes
+  Do we have the fdate() command using gfortran...  yes
+  Do we have the etime() command using gfortran... c,r: yes (SbR)
+  Can we call simple C routines (here, "cloc()") using gfortran...  yes
+  Can we unlimit the stack size using gfortran...  yes
+  Can we register a signal handler using gfortran...  no
+  Can we use stat() through C calls...  yes
+  Can we create NetCDF-enabled binaries...  yes
+  Can we create LAPACK-enabled binaries...  no
+  Can we call FLUSH intrinsic subroutine...  yes
+
+===  Setting defaults  ===
+  Adding MODS directories: 
+Error: MODS directory "../code/" not found!
