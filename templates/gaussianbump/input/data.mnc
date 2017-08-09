@@ -1,7 +1,0 @@
-# NetCDF options.
- &MNC_01
- monitor_mnc      = .false.,
- mnc_use_outdir   = .false.,
- pickup_write_mnc = .false., 
- pickup_read_mnc  = .false., 
- /

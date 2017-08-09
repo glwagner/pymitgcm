@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pymitgcm
 
-#gcmdir = '/data5/glwagner/Numerics/pymitgcm/MITgcm'
 gcmdir = '/Users/glwagner/Software/MITgcm'
 
 # Parameters
