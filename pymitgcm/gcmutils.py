@@ -1,81 +1,90 @@
 import os
-import numpy as np
 import time, subprocess
+import numpy as np
+import matplotlib.pyplot as plt
+import netCDF4
 
 
 
-def rungcm(rundir, builddir=None, inputdir=None, clean=False):
+def rungcm(runpath, buildpath=None, inputpath=None, overwrite=False, 
+    outputname='run.info'):
     """ Run a compiled MITgcm model.
         
     Args:
-        rundir (str): Path the directory in which to run the model.
+        runpath (str): Path the directory in which to run the model.
 
-        builddir (str): Path to directory that contains the executable 
-            'mitgcmuv'. Assumes rundir if unset.
+        buildpath (str): Path to directory that contains the executable 
+            'mitgcmuv'. Assumes runpath if unset.
 
-        inputdir (str): Path to the directory that contains input 
+        inputpath (str): Path to the directory that contains input 
             namelists and binary files. 
-
-        clean (bool): Whether or not to clean the run directory prior 
-            to model execution.
     """
 
-    rundir = os.path.abspath(rundir)
-    os.chdir(rundir)
+    curdir = os.getcwd()
 
-    if builddir is None: builddir=rundir
+    runpath = os.path.abspath(runpath)
+    os.chdir(runpath)
 
-    if inputdir is not None: 
-        for filename in os.listdir(inputdir):
-            os.symlink(os.path.join(inputdir, filename),
-                os.path.join(rundir, filename))
+    if buildpath is None: buildpath=runpath
 
-    if clean:
-        for filename in os.listdir(rundir):
-            os.remove(os.path.join(rundir, filename))
+    if inputpath is not None: 
+        for filename in os.listdir(inputpath):
 
-    with open('./output.txt', 'w') as output:
-        _, stopmsg = subprocess.Popen(os.path.join(builddir, 'mitgcmuv'), 
+            inputfilepath = os.path.join(inputpath, filename)
+            runfilepath = os.path.join(runpath, filename)
+
+            if os.path.isfile(inputfilepath):
+
+                if os.path.exists(runfilepath) and overwrite:
+                    os.remove(runfilepath)
+
+                os.symlink(inputfilepath, runfilepath)
+                
+
+    with open(os.path.join(runpath, outputname), 'w') as output:
+        _, stopmsg = subprocess.Popen(os.path.join(buildpath, 'mitgcmuv'), 
             stdout=output, stderr=subprocess.PIPE).communicate()
             
+    os.chdir(curdir)
+
     return stopmsg
 
 
 
 
 
-def genmake(gcmdir, optfilename=None, mpi=False, mnc=True, builddir=None):
+def genmake(gcmpath, optfilename=None, mpi=False, mnc=True, buildpath=None):
     """ Execute MITgcm's 'genmake2' with appropriate compile options in the 
     build directory.
     
     Args:
-        gcmdir (str): Path to MITgcm.
+        gcmpath (str): Path to MITgcm.
 
         optfilename (str): Name of the optfile. Must be an optfile in 
-            gcmdir/tools/build_options.
+            gcmpath/tools/build_options.
 
         mpi (bool): Whether or not to compile with mpi enabled.
 
         mnc (bool): Whether or not to compile with NetCDF enabled.
 
-        builddir (str): Directory in which to initiate the build.
+        buildpath (str): Directory in which to initiate the build.
     """
 
     # Change directories if specified
-    if builddir is not None: os.chdir(builddir)
+    if buildpath is not None: os.chdir(buildpath)
 
     # Generate compile command
-    compilecmd = ["{}/tools/genmake2".format(gcmdir)]
+    compilecmd = ["{}/tools/genmake2".format(gcmpath)]
     options = {}
 
     options['mods']    = "-mods=../code/"
-    options['rootdir'] = "-rootdir={}".format(gcmdir)
+    options['rootdir'] = "-rootdir={}".format(gcmpath)
 
     if mnc: options['mnc'] = "-enable=mnc"
     if mpi: options['mpi'] = "-mpi"
         
     if optfilename is not None:
-        optfile = os.path.join(gcmdir, 'tools', 'build_options', optfilename)
+        optfile = os.path.join(gcmpath, 'tools', 'build_options', optfilename)
         if os.path.exists(optfile):
             options['optfile'] = "-optfile={}".format(optfile)
 
@@ -94,16 +103,16 @@ def genmake(gcmdir, optfilename=None, mpi=False, mnc=True, builddir=None):
         raise RuntimeError('Genmake2 failed.')
 
 
-def makedepend(builddir=None):
+def makedepend(buildpath=None):
     """ Execute 'make depend' in a build directory. 'genmake2' must be
     successfully executed in the directory prior to running this command.
 
     Args:
-        builddir (str): Build directory where genmake2 was run. If unset
+        buildpath (str): Build directory where genmake2 was run. If unset
             the current directory is assumed.
     """ 
 
-    if builddir is not None: os.chdir(builddir)
+    if buildpath is not None: os.chdir(buildpath)
 
     with open('out_makedepend.txt', 'w') as makedependout:
         with open('err_makedepend.txt', 'w') as makedependerr:
@@ -117,12 +126,12 @@ def makedepend(builddir=None):
         raise RuntimeError('make depend failed.')
 
 
-def make(npmake=1, builddir=None):
+def make(npmake=1, buildpath=None):
     """ 
         npmake (int): Number of processors to use for compilation.
     """
 
-    if builddir is not None: os.chdir(builddir)
+    if buildpath is not None: os.chdir(buildpath)
 
     with open('out_make.txt', 'w') as makeout:
         with open('err_make.txt', 'w') as makeerr:
@@ -136,15 +145,15 @@ def make(npmake=1, builddir=None):
         raise RuntimeError('make failed.')
 
 
-def compile(gcmdir, optfilename=None, npmake=1,
-    mpi=False, mnc=True, builddir=None):
+def compile(gcmpath, optfilename=None, npmake=1,
+    mpi=False, mnc=True, buildpath=None):
     """ Compile an MITgcm setup using genmake2, make depend, and make. 
     
     Args:
-        gcmdir (str): Path to MITgcm.
+        gcmpath (str): Path to MITgcm.
 
         optfilename (str): Name of the optfile. Must be an optfile in 
-            gcmdir/tools/build_options.
+            gcmpath/tools/build_options.
 
         npmake (int): Number of processors to use for compilation.
 
@@ -152,24 +161,73 @@ def compile(gcmdir, optfilename=None, npmake=1,
 
         mnc (bool): Whether or not to compile with NetCDF enabled.
 
-        builddir (str): Directory in which to initiate the build.
+        buildpath (str): Directory in which to initiate the build.
     """
 
-    if builddir is not None: os.chdir(builddir)
+    if buildpath is not None: os.chdir(buildpath)
 
-    genmake(self.gcmdir, optfilename=optfilename, mpi=mpi, mnc=mnc)
+    genmake(self.gcmpath, optfilename=optfilename, mpi=mpi, mnc=mnc)
     makedepend()
     make(npmake=npmake)
 
 
-def changesizevars(vars, sizedir='.'):
+
+
+def readsizevars(*args):
     """Change a variable in the header file SIZE.h.
         
     Args:
-        vars (str): Name of the variable to be changed. This variable must be
-            contained in a small list of 'validvars'.
+        sizepath (str): Path to the 'code' directory where the new SIZE.h will 
+            be parsed.
+
+    Returns: A dictionary with parsed variables.
+    """
+
+    if len(args) > 1:
+        raise TypeError("Expected at most 1 argument, got %d" % len(args))
+    elif len(args) is 0:
+        sizepath = os.getcwd()
+    else:
+        sizepath = os.path.abspath(args[0])
+
+    sizename = 'SIZE.h'
+    varnames = ['sNx', 'sNy', 'OLx', 'OLy', 'nSx', 'nSy', 
+        'nPx', 'nPy', 'Nr']
+
+    # Read file
+    with open(os.path.join(sizepath, sizename), 'r') as sizefile:
+        sizelines = sizefile.readlines()
+
+    sizevars = {}
+    for line in sizelines:
+        for var in varnames:
+            if (len(line) > 1 and 
+                line.lstrip()[0] is not 'C' and 
+                'integer' not in line.lower() and
+                'max_olx' not in line.lower() and
+                'max_oly' not in line.lower() and
+                var.lower() in line.lower()):
+
+                # Find text between '=' and ',' or ')' and assign to sizevars.
+                sep = '|'
+                line = line.replace(' ', '').lower()
+                for char in ['=', ',', ')']: line=line.replace(char, sep)
+
+                try:    sizevars[var] = int(line.split(sep)[1])
+                except: pass
+                    
+    return sizevars
+
+
+
+def changesizevars(vars, sizepath=None):
+    """Change a variable in the header file SIZE.h.
         
-        sizedir (str): Path to the 'code' directory where the new SIZE.h will 
+    Args:
+        vars (dict): Dictionary of the form {varname: value}. The varname
+            must be contained in a small list of 'validvars'.
+        
+        sizepath (str): Path to the 'code' directory where the new SIZE.h will 
             be saved.
     """
 
@@ -178,9 +236,13 @@ def changesizevars(vars, sizedir='.'):
     validvarnames = ['sNx', 'sNy', 'OLx', 'OLy', 'nSx', 'nSy', 
         'nPx', 'nPy', 'Nr']
 
+    if sizepath is None: sizepath = os.getcwd()
+
     # Read file
-    with open(os.path.join(sizedir, sizename), 'r') as sizefile:
+    with open(os.path.join(sizepath, sizename), 'r') as sizefile:
         sizelines = sizefile.readlines()
+
+           
 
     for varname, value in vars.items():
 
@@ -206,13 +268,13 @@ def changesizevars(vars, sizedir='.'):
                         prespace, varname, value)
             linenum += 1
 
-    with open(os.path.join(sizedir, sizename), 'w') as sizefile:
+    with open(os.path.join(sizepath, sizename), 'w') as sizefile:
         for line in sizelines:
             sizefile.write(line)
-     
 
 
-def changesizevar(var, value, codedir='.', origdir=None):
+
+def changesizevar(var, value, codepath='.', origpath=None):
     """Change a variable in the header file SIZE.h.
         
     Args:
@@ -223,11 +285,11 @@ def changesizevar(var, value, codedir='.', origdir=None):
             is always associated with some aspect of the grid size, it must 
             be an integer.
 
-        codedir (str): Path to the 'code' directory where the new SIZE.h will 
+        codepath (str): Path to the 'code' directory where the new SIZE.h will 
             be saved.
 
-        origdir (str): Path to the template directory with an original copy of 
-            SIZE.h. If this path is not specified, origdir is set to codedir.
+        origpath (str): Path to the template directory with an original copy of 
+            SIZE.h. If this path is not specified, origpath is set to codepath.
             
             
     """
@@ -237,8 +299,8 @@ def changesizevar(var, value, codedir='.', origdir=None):
     validvars = ['sNx', 'sNy', 'OLx', 'OLy', 'nSx', 'nSy', 
         'nPx', 'nPy', 'Nr']
 
-    if origdir is None:
-        origdir = codedir
+    if origpath is None:
+        origpath = codepath
 
     if var not in validvars:
         raise ValueError("The parameter 'var' {} must be one of {}!".format(
@@ -247,11 +309,11 @@ def changesizevar(var, value, codedir='.', origdir=None):
         raise ValueError("The parameter 'value' must be an integer.")
 
     # Make output 'code' directory if it does not exist
-    if not os.path.exists(codedir):
-        os.makedirs(codedir)
+    if not os.path.exists(codepath):
+        os.makedirs(codepath)
 
     # Read file
-    with open(os.path.join(origdir, sizename), 'r') as sizefile: 
+    with open(os.path.join(origpath, sizename), 'r') as sizefile: 
         sizelines = sizefile.readlines()
 
     linenum = 0
@@ -267,49 +329,58 @@ def changesizevar(var, value, codedir='.', origdir=None):
                     prespace, var, value)
         linenum += 1
 
-    with open(os.path.join(codedir, sizename), 'w') as sizefile:
+    with open(os.path.join(codepath, sizename), 'w') as sizefile:
         for line in sizelines:
             sizefile.write(line)
             
     
 
-def get_namelist_param(param, nmldir='.'):
+def get_namelist_param(param, nmlpath='.'):
     """Returns the value of a parameter extracted from within the namelists 
-    in nmldir."""
+    in nmlpath."""
 
     # Read namelists
     namefile = {}
-    for filename in os.listdir(nmldir):
-        namefiles[filename] = f90nml.read(os.path.join(nmldir, filename))
+    for filename in os.listdir(nmlpath):
+        namefiles[filename] = f90nml.read(os.path.join(nmlpath, filename))
 
     # Sift namelists to find param
     return sift_nested_dict(param, namefiles)
     
 
-def siftdict(param, d, value=None):
-    """Sift recurively through a nested dictionary in search of 
-    the key 'param' and either return its value or throw an error."""
 
-    if param.lower() in d.keys():
-        value = d[param]
+def siftdict(param, d, value=None, dpath=None, level=1):
+    """Sift recursively and case-inesensitively through a nested 
+    dictionary in search of the key 'param' and either return its 
+    value or None if not found. """
+
+    if dpath is None: dpath=[]
+
+    lowered = {k.lower():v for k, v in d.items()}
+    if param.lower() in lowered.keys():
+        value = lowered[param.lower()]
+        dpath.append(param.lower())
     else: 
         for k, v in d.items():
-            if isinstance(v, dict):
-                value = sift_nested_dict(param, v, value=value)
-        
-    return value
+            if isinstance(v, dict) and value is None:
+                dpath.append(k)
+                value, dpath, level = siftdict(param, v, value=value,
+                    level=level+1, dpath=dpath)
+
+    if value is None:
+        return value, dpath[:-1], level-1
+    else:
+        return value, dpath, level
 
 
-    
-
-def savegcminput(savevars, savedir='.'):
+def savegcminput(savevars, savepath='.'):
     """Convert and save variables in proper format for input into
     MITgcm.
 
     Args:
         savevars (dict): A dictionary of variables in the form savename: var.
         
-        savedir (str):  A string specifying the directory in which to save
+        savepath (str):  A string specifying the directory in which to save
             the binary files.
     """
 
@@ -321,7 +392,11 @@ def savegcminput(savevars, savedir='.'):
         savevars[savename] = savevars[savename].astype(savetype) 
         varshape = savevars[savename].shape
 
-        with open(os.path.join(savedir, savename), 'wb') as file: 
+        print(savename)
+        print(varshape)
+        print(len(varshape))
+
+        with open(os.path.join(savepath, savename), 'wb') as file: 
             if len(varshape) is 1:
                 savevars[savename].tofile(file)            
 
@@ -557,7 +632,7 @@ def write_data_diagnostics(fields, freqs, levels,
     # Parameters
     levelLinewidth = 10
     fieldLinewidth = 3
-    diagfilename = os.path.join(savedir, 'data.diagnostics')
+    diagfilename = os.path.join(savepath, 'data.diagnostics')
     ndiags = len(fields.keys())
 
     # Check to see if file exists
@@ -640,3 +715,32 @@ def truncate(a, digits=3):
     return np.round(np.round(a
         / 10**np.floor(np.log10(np.abs(a)+1e-15)-digits))
         * 10**np.floor(np.log10(np.abs(a)+1e-15)-digits), 14)
+
+
+
+def quicklook(runpath, var='Temp'):
+    """ Show rudimentary plots of the model state. """
+
+    grid = netCDF4.Dataset(os.path.join(runpath,
+        'grid.t{:03d}.nc'.format(1)), 'r') 
+    
+    state = netCDF4.Dataset(os.path.join(runpath,
+        'state.{:010d}.t{:03d}.nc'.format(0, 1)), 'r')
+
+    nt  = state.variables[var][:, 0, 0, 0].size
+    phi = state.variables[var][0, :, 0, :].squeeze()
+
+    fig = plt.figure()
+    plt.imshow(phi)
+    plt.colorbar()
+        
+    for i in range(nt):
+        print("Savetime %d".format(i))
+
+        phi = state.variables[var][i, :, 0, :].squeeze()
+
+        plt.clf()
+        plt.imshow(phi)
+        plt.colorbar()
+
+        plt.pause(0.1)

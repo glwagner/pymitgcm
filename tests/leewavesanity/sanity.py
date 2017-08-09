@@ -22,11 +22,11 @@ m = pymitgcm.RectangularModel(nx, 1, nz, Lx, Ly, Lz, gcmdir=gcmdir,
     templatedir='../../templates/leewavesanity')
 
 # Timestepper
-m.tstepper['deltat']     = 1.0
-m.tstepper['ntimesteps'] = 100
-m.tstepper['pchkptfreq'] = 100
-m.tstepper['chkptfreq']  = 100
-m.tstepper['dumpfreq']   = ntimesteps//10
+m.timestepper['deltat']     = 1.0
+m.timestepper['ntimesteps'] = 100
+m.timestepper['pchkptfreq'] = 100
+m.timestepper['chkptfreq']  = 100
+m.timestepper['dumpfreq']   = m.timestepper['ntimesteps']//10
 
 m.init_ic()
 m.ic.set_constant_stratification(N=N, 

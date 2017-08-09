@@ -34,6 +34,8 @@ class InitialCondition:
         savevars = {}
 
         for varname, var in self.fields.items():
+            print(varname)
+            print(var)
             savevars[self.filenames[varname]] = var
 
         gcmutils.savegcminput(savevars, savedir=savedir)

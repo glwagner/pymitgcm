@@ -61,39 +61,39 @@ class OpenBoundaryCondition:
 
     def add_uvel(self, U):
         """ Set the eastward velocity of the open boundary condition. """
-
         if 'U' not in self.fields.keys():
             self.fields['U'] = np.zeros((self.nn, self.nz)) + U
         else:
-            self.fields['U'] += U
+            self.fields['U'] = self.fields['U'] + U
+        self.fields['U'] = self.fields['U'].squeeze()
 
 
-    def set_vvel(self, V):
+    def add_vvel(self, V):
         """ Set the northward velocity of the open boundary condition. """
-
         if 'V' not in self.fields.keys():
             self.fields['V'] = np.zeros((self.nn, self.nz)) + V
         else:
-            self.fields['V'] += V
+            self.fields['V'] = self.fields['V'] + V
+        self.fields['V'] = self.fields['V'].squeeze()
 
 
-    def set_theta(self, T):
+    def add_theta(self, T):
         """ Set the temperature distribution the open boundary condition. """
-
         if 'T' not in self.fields.keys():
             self.fields['T'] = np.zeros((self.nn, self.nz)) + T
         else:
-            self.fields['T'] += T
+            self.fields['T'] = self.fields['T'] + T
+        self.fields['T'] = self.fields['T'].squeeze()
 
 
-    def set_salt(self, S):
+    def add_salt(self, S):
         """ Set the salinity distribution the open boundary condition. """
-
         if 'S' not in self.fields.keys():
             self.fields['S'] = np.zeros((self.nn, self.nz)) + S
         else:
-            self.fields['S'] += S
-
+            self.fields['S'] = self.fields['S'] + S
+        self.fields['S'] = self.fields['S'].squeeze()
+        
 
     def copy_ic(self, ic):
         """ Continue an initial condition into the open boundary """

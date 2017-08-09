@@ -60,12 +60,12 @@
 
 &parm03
     niter0 = 0
-    ntimesteps = 1000
-    deltat = 50.0
+    ntimesteps = 100
+    deltat = 1.0
     abeps = 0.1
-    pchkptfreq = 1000.0
-    chkptfreq = 1000.0
-    dumpfreq = 100.0
+    pchkptfreq = 100
+    chkptfreq = 100
+    dumpfreq = 10
     monitorfreq = 2500.0
     monitorselect = 2
 /
