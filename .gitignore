@@ -1,3 +1,6 @@
+**/*.swp
+**/*.png
+**/*.pdf
 **/CVS
 **/run
 **/build
