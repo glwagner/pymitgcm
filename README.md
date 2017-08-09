@@ -1,4 +1,12 @@
 # pymitgcm
 
-This code provides classes and routines that aid in setting up
-and running models in MITgcm.
+pymitgcm provides classes and routines that aid the setup and running
+of models in [MITgcm][].
+
+# Basics of the interface with MITgcm
+
+# Code organization
+
+# Developers
+
+[MITgcm]: http://mitgcm.org
