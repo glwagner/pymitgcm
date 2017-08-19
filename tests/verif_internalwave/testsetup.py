@@ -21,10 +21,12 @@ if not setup.hasexecutable():
     setup.compilesetup(gcmpath, optfilename=optfilename)
 
 ntimesteps = setup.getparam('ntimesteps')
+print(ntimesteps)
 
-setup.setparam('ntimesteps', 1000)
-setup.runsetup(overwrite=True)
+#setup.setparam('ntimesteps', 1000)
 
-# Return ntimesteps to its former value
-setup.getparam('ntimesteps', ntimesteps)
+#setup.runsetup(overwrite=True)
+#
+## Return ntimesteps to its former value
+#setup.getparam('ntimesteps', ntimesteps)
 
