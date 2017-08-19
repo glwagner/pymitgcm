@@ -5,28 +5,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pymitgcm
 
+# Number of time steps
+ntimesteps = 1000
+
+# Paths and parameters custom to Greg's system
+gcmpath = '/Users/glwagner/Numerics/pymitgcm/MITgcm'
 setuppath = os.path.join(os.getcwd(), '../../templates/verif_internalwave')
 optfilename = 'neve'
 
-if os.path.exists(os.path.join(os.getcwd(), '../../MITgcm')):
-    gcmpath = os.path.join(os.getcwd(), '../../MITgcm')
-else:
-    gcmpath = '/Users/glwagner/Numerics/pymitgcm/MITgcm'
-
-
-
+# Create and compile setup
 setup = pymitgcm.Setup(setuppath)
+setup.compilesetup(gcmpath, optfilename=optfilename)
 
-if not setup.hasexecutable():
-    setup.compilesetup(gcmpath, optfilename=optfilename)
+# Get current ntimesteps
+oldntimesteps = setup.getparam('ntimesteps')
+print('Old ntimesteps: {}'.format(oldntimesteps))
 
-ntimesteps = setup.getparam('ntimesteps')
-print(ntimesteps)
+# Set new ntimesteps
+setup.setparam('ntimesteps', ntimesteps)
+newntimesteps = setup.getparam('ntimesteps')
+print('New ntimesteps: {}'.format(newntimesteps))
 
-#setup.setparam('ntimesteps', 1000)
-
-#setup.runsetup(overwrite=True)
-#
-## Return ntimesteps to its former value
-#setup.getparam('ntimesteps', ntimesteps)
-
+# Run the setup and return ntimesteps to its former value
+setup.runsetup(overwrite=True)
+setup.setparam('ntimesteps', 100)

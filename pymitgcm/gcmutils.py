@@ -27,16 +27,15 @@ def rungcm(runpath, buildpath=None, inputpath=None, overwrite=False,
 
     if buildpath is None: buildpath=runpath
 
+    # Symlink input into run directory
     if inputpath is not None: 
         for filename in os.listdir(inputpath):
-
             inputfilepath = os.path.join(inputpath, filename)
             runfilepath = os.path.join(runpath, filename)
-
             if os.path.isfile(inputfilepath):
-
-                if os.path.exists(runfilepath) and overwrite:
-                    os.remove(runfilepath)
+                if overwrite:
+                    try: os.remove(runfilepath)
+                    except: pass
 
                 os.symlink(inputfilepath, runfilepath)
                 
