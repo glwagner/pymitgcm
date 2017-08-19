@@ -301,7 +301,9 @@ class Setup:
 
 
     
-
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+# M O D E L C L A S S 
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
 class Model:
     def __init__(self, templatepath=None, gcmpath=None):
         """ Initialize an pymitgcm model. """

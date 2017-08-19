@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pymitgcm
 
-setuppath = os.path.join(os.getcwd(), '../../templates/verif_internalwave')
+templatepath = os.path.join(os.getcwd(), '../../templates/verif_exp4')
 optfilename = 'neve'
 
 if os.path.exists(os.path.join(os.getcwd(), '../../MITgcm')):
@@ -15,7 +15,7 @@ else:
 
 
 
-setup = pymitgcm.Setup(setuppath)
+setup = pymitgcm.Setup(templatepath)
 
 if not setup.hasexecutable():
     setup.compilesetup(gcmpath, optfilename=optfilename)
