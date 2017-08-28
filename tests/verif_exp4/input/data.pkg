@@ -1,0 +1,6 @@
+&packages
+    useobcs = .true.
+    useptracers = .false.
+    userbcs = .false.
+    usemnc = .true.
+/

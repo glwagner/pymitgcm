@@ -8,7 +8,7 @@ import pymitgcm
 
 templatepath = '/Users/glwagner/Numerics/pymitgcm/templates/internalwaveverif'
 gcmpath = '/Users/glwagner/Numerics/pymitgcm/MITgcm'
-optfilename = 'neve'
+optfile = 'neve'
 
 m = pymitgcm.Model(templatepath=templatepath, gcmpath=gcmpath)
 

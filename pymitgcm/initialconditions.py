@@ -27,18 +27,16 @@ class InitialCondition:
         self.fields = {}
 
 
-    def save(self, savedir):
+    def save(self, savepath):
         """ Save initial condition as binary file in MITgcm format. """
     
         # Build savevars dictionary
         savevars = {}
 
         for varname, var in self.fields.items():
-            print(varname)
-            print(var)
             savevars[self.filenames[varname]] = var
 
-        gcmutils.savegcminput(savevars, savedir=savedir)
+        gcmutils.savegcminput(savevars, savepath=savepath)
             
 
     def set_theta(self, T):

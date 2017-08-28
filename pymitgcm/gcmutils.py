@@ -1,11 +1,57 @@
-import os
-import time, subprocess
+import os, glob, re, logging
+import time, subprocess, f90nml
 import numpy as np
 import matplotlib.pyplot as plt
 import netCDF4
 
 
 
+
+logger = logging.getLogger(name='gcmutils')
+logger.setLevel(20)    # Set logging level to 'info'
+
+
+
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+# Saving
+def savegcminput(savevars, savepath='.'):
+    """Convert and save variables in proper format for input into
+    MITgcm.
+
+    Args:
+        savevars (dict): A dictionary of variables in the form savename: var.
+        
+        savepath (str):  A string specifying the directory in which to save
+            the binary files.
+    """
+
+    # Convert variables to big endian, double precision for saving.
+    savetype = '>f8'
+
+    for savename in savevars.keys():
+
+        savevars[savename] = savevars[savename].astype(savetype) 
+        varshape = savevars[savename].shape
+
+        with open(os.path.join(savepath, savename), 'wb') as file: 
+            if len(varshape) is 1:
+                savevars[savename].tofile(file)            
+
+            elif len(varshape) is 2:
+                for k in range(varshape[1]):
+                    savevars[savename][:, k].tofile(file)
+
+            elif len(varshape) is 3:
+                for k in range(varshape[2]):
+                    for l in range(varshape[1]):
+                        savevars[savename][:, l, k].tofile(file)
+
+
+
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+# Running and compiling
 def rungcm(runpath, buildpath=None, inputpath=None, overwrite=False, 
     outputname='run.info'):
     """ Run a compiled MITgcm model.
@@ -21,11 +67,8 @@ def rungcm(runpath, buildpath=None, inputpath=None, overwrite=False,
     """
 
     curdir = os.getcwd()
-
-    runpath = os.path.abspath(runpath)
-    os.chdir(runpath)
-
-    if buildpath is None: buildpath=runpath
+    os.chdir(os.path.abspath(runpath))
+    if buildpath is None: buildpath=os.getcwd()
 
     # Symlink input into run directory
     if inputpath is not None: 
@@ -51,15 +94,14 @@ def rungcm(runpath, buildpath=None, inputpath=None, overwrite=False,
 
 
 
-
-def genmake(gcmpath, optfilename=None, mpi=False, mnc=True, buildpath=None):
+def genmake(gcmpath, optfile=None, mpi=False, mnc=True, buildpath=None):
     """ Execute MITgcm's 'genmake2' with appropriate compile options in the 
     build directory.
     
     Args:
         gcmpath (str): Path to MITgcm.
 
-        optfilename (str): Name of the optfile. Must be an optfile in 
+        optfile (str): Name of the optfile. Must be an optfile in 
             gcmpath/tools/build_options.
 
         mpi (bool): Whether or not to compile with mpi enabled.
@@ -82,10 +124,11 @@ def genmake(gcmpath, optfilename=None, mpi=False, mnc=True, buildpath=None):
     if mnc: options['mnc'] = "-enable=mnc"
     if mpi: options['mpi'] = "-mpi"
         
-    if optfilename is not None:
-        optfile = os.path.join(gcmpath, 'tools', 'build_options', optfilename)
-        if os.path.exists(optfile):
-            options['optfile'] = "-optfile={}".format(optfile)
+    if optfile is not None:
+        optfilepath = os.path.join(gcmpath, 
+            'tools', 'build_options', optfile)
+        if os.path.exists(optfilepath):
+            options['optfile'] = "-optfile={}".format(optfilepath)
 
     for opt in options.values():
         compilecmd.append(opt)
@@ -98,8 +141,10 @@ def genmake(gcmpath, optfilename=None, mpi=False, mnc=True, buildpath=None):
     if process is not 0:
         with open('err_genmake2.txt', 'r') as errfile:
             for line in errfile:
-                print(line.rstrip('\n'))
+                logger.error(line.rstrip('\n'))
         raise RuntimeError('Genmake2 failed.')
+
+
 
 
 def makedepend(buildpath=None):
@@ -121,8 +166,10 @@ def makedepend(buildpath=None):
     if process is not 0:
         with open('err_makedepend.txt', 'r') as errfile:
             for line in errfile:
-                print(line.rstrip('\n'))
+                logger.error(line.rstrip('\n'))
         raise RuntimeError('make depend failed.')
+
+
 
 
 def make(npmake=1, buildpath=None):
@@ -140,18 +187,20 @@ def make(npmake=1, buildpath=None):
     if process is not 0:
         with open('err_make.txt', 'r') as errfile:
             for line in errfile:
-                print(line.rstrip('\n'))
+                logger.error(line.rstrip('\n'))
         raise RuntimeError('make failed.')
 
 
-def compile(gcmpath, optfilename=None, npmake=1,
+
+
+def compile(gcmpath, optfile=None, npmake=1,
     mpi=False, mnc=True, buildpath=None):
     """ Compile an MITgcm setup using genmake2, make depend, and make. 
     
     Args:
         gcmpath (str): Path to MITgcm.
 
-        optfilename (str): Name of the optfile. Must be an optfile in 
+        optfile (str): Name of the optfile. Must be an optfile in 
             gcmpath/tools/build_options.
 
         npmake (int): Number of processors to use for compilation.
@@ -165,12 +214,51 @@ def compile(gcmpath, optfilename=None, npmake=1,
 
     if buildpath is not None: os.chdir(buildpath)
 
-    genmake(self.gcmpath, optfilename=optfilename, mpi=mpi, mnc=mnc)
+    genmake(self.gcmpath, optfile=optfile, mpi=mpi, mnc=mnc)
     makedepend()
     make(npmake=npmake)
 
 
 
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+# Manipulating text and namelists
+def correctdatanamelist(datanml, correctto='z'):
+    """ Return a data f90nml namelist object with offending parameter names
+    changed. """
+
+    # Names to change paired with new names
+    if correctto is 'z':
+        pairs = {
+            'viscar'   : 'viscaz', 
+            'diffkrt'  : 'diffkzt', 
+            'diffkrs'  : 'diffkzs', 
+            'viscar'   : 'viscaz', 
+            'delr'     : 'delz', 
+            'delrfile' : 'delzfile', 
+        }
+    elif correctto is 'r':
+        pairs = {
+            'viscaz'   : 'viscar', 
+            'diffkzt'  : 'diffkrt', 
+            'diffkzs'  : 'diffkrs', 
+            'viscaz'   : 'viscar', 
+            'delz'     : 'delr', 
+            'delzfile' : 'delrfile', 
+        }
+
+    for param, newparam in pairs.items():
+        value, dpath, _ = siftdict(param, datanml)
+        newvalue, _, _  = siftdict(newparam, datanml)
+
+        if value is not None:
+            nml = dpath[0] # Namelist is the first address in the path
+            datanml[nml][newparam] = (
+                value if newvalue is None else newvalue)
+            datanml[nml].pop(param)
+
+    return datanml
+        
 
 def readsizevars(*args):
     """Change a variable in the header file SIZE.h.
@@ -216,6 +304,7 @@ def readsizevars(*args):
                 except: pass
                     
     return sizevars
+
 
 
 
@@ -270,6 +359,7 @@ def changesizevars(vars, sizepath=None):
     with open(os.path.join(sizepath, sizename), 'w') as sizefile:
         for line in sizelines:
             sizefile.write(line)
+
 
 
 
@@ -332,6 +422,7 @@ def changesizevar(var, value, codepath='.', origpath=None):
         for line in sizelines:
             sizefile.write(line)
             
+
     
 
 def get_namelist_param(param, nmlpath='.'):
@@ -346,6 +437,7 @@ def get_namelist_param(param, nmlpath='.'):
     # Sift namelists to find param
     return sift_nested_dict(param, namefiles)
     
+
 
 
 def siftdict(param, d, value=None, dpath=None, level=1):
@@ -372,41 +464,7 @@ def siftdict(param, d, value=None, dpath=None, level=1):
         return value, dpath, level
 
 
-def savegcminput(savevars, savepath='.'):
-    """Convert and save variables in proper format for input into
-    MITgcm.
 
-    Args:
-        savevars (dict): A dictionary of variables in the form savename: var.
-        
-        savepath (str):  A string specifying the directory in which to save
-            the binary files.
-    """
-
-    # Convert variables to big endian, double precision for saving.
-    savetype = '>f8'
-
-    for savename in savevars.keys():
-
-        savevars[savename] = savevars[savename].astype(savetype) 
-        varshape = savevars[savename].shape
-
-        print(savename)
-        print(varshape)
-        print(len(varshape))
-
-        with open(os.path.join(savepath, savename), 'wb') as file: 
-            if len(varshape) is 1:
-                savevars[savename].tofile(file)            
-
-            elif len(varshape) is 2:
-                for k in range(varshape[1]):
-                    savevars[savename][:, k].tofile(file)
-
-            elif len(varshape) is 3:
-                for k in range(varshape[2]):
-                    for l in range(varshape[1]):
-                        savevars[savename][:, l, k].tofile(file)
 
 
 def get_diag_list_header():
@@ -427,8 +485,8 @@ def get_diag_list_header():
         "#      frequency (iter)\n"
         "#\n"
         "#  levels(:,n) : list of levels to write to file (Notes: declared \n"
-        "#      as REAL) when this entry is missing, select all common levels\n" 
-        "#      of this list\n"
+        "#      as REAL) when this entry is missing, select all common\n" 
+        "#      levels of this list\n"
         "#\n"
         "#  fields(:,n) : list of diagnostics fields (8.c) \n"
         "#      (see 'available_diagnostics' file for the list of all\n"
@@ -438,6 +496,8 @@ def get_diag_list_header():
     )
 
     return header
+
+
 
 
 def get_diag_stat_header():
@@ -468,6 +528,7 @@ def get_diag_stat_header():
     )
 
     return header 
+
 
 
  
@@ -606,6 +667,8 @@ def replace_namelist_param(namepath, params, savepath='.'):
            newnamefile.write(line) 
 
 
+
+
 def write_data_diagnostics(fields, freqs, levels, 
     savepath='.', overwrite=False):
     """ Write a diagnostics file for MITgcm diagnostics.
@@ -708,6 +771,11 @@ def write_data_diagnostics(fields, freqs, levels,
         diagfile.write(fulldiagtext)
 
 
+
+
+
+# <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
+# Miscellaneous math
 def truncate(a, digits=3):
     """ Return the array a, truncated to a specified number of 
     digits. """
@@ -716,30 +784,33 @@ def truncate(a, digits=3):
         * 10**np.floor(np.log10(np.abs(a)+1e-15)-digits), 14)
 
 
+def getcompacttiling(nx, ny, npr):
+    """ Find the "most square" tiling for resolution nx, ny and
+    number of processors npr. Returns tiling as a 2-tuple with the form
+    (npx, npy). Returns None if no tiling is found."""
 
-def quicklook(runpath, var='Temp'):
-    """ Show rudimentary plots of the model state. """
+    tilingtype = [ 
+        ('npx', int), ('npy', int), ('packing', int),
+        ('snx', float), ('sny', float), ('squareness', float)
+    ]   
+            
+    # Create a structured array of all possible tilings to sort
+    tilings = np.array([ 
+        (i, int(npr/i), i+int(npr/i), nx/i, ny*i/npr, abs(nx/i-ny*i/npr)) 
+        for i in range(1, npr+1) if npr % i == 0.0 ],
+        dtype=tilingtype)
 
-    grid = netCDF4.Dataset(os.path.join(runpath,
-        'grid.t{:03d}.nc'.format(1)), 'r') 
-    
-    state = netCDF4.Dataset(os.path.join(runpath,
-        'state.{:010d}.t{:03d}.nc'.format(0, 1)), 'r')
+    # Sort by squareness of subdomains, which is 0 for perfect squares.
+    tilings = list(np.sort(tilings, order=['squareness', 'packing', 'npx']))
+    tilings.reverse() # To use .pop()
 
-    nt  = state.variables[var][:, 0, 0, 0].size
-    phi = state.variables[var][0, :, 0, :].squeeze()
+    # Test each tiling
+    goodtiling = None 
+    while len(tilings) > 0:
+        testtiling = tilings.pop()
+        if (testtiling[3] == int(testtiling[3]) and
+            testtiling[4] == int(testtiling[4])): # tiling is valid
+            goodtiling = (int(testtiling[0]), int(testtiling[1]))
+            tilings = []
 
-    fig = plt.figure()
-    plt.imshow(phi)
-    plt.colorbar()
-        
-    for i in range(nt):
-        print("Savetime %d".format(i))
-
-        phi = state.variables[var][i, :, 0, :].squeeze()
-
-        plt.clf()
-        plt.imshow(phi)
-        plt.colorbar()
-
-        plt.pause(0.1)
+    return goodtiling

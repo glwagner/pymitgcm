@@ -1,0 +1,16 @@
+ &OBCS_PARM01
+ OBCSfixTopo=.FALSE.,
+ OB_Jnorth= 200*-1,
+ OB_Jsouth= 200*1,
+ OB_Ieast = 200*-1,
+ OB_Iwest = 200*1,
+ useOBCSprescribe = .TRUE.,
+ OBCS_monitorFreq= 1200.,
+ OBCS_monSelect = 1,
+ &
+
+# Orlanski parameters
+#Cmax=0.45,
+#cVelTimeScale=1000.,
+ &OBCS_PARM02
+ &

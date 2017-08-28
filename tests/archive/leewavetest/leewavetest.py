@@ -29,5 +29,5 @@ m.gensetup(cleansetup=True, namepatch={'data': {'parm01': {'viscaz': 0.002}}})
 #
 #plt.show()
 
-m.compile(optfilename='sverdrup_glwagner', npmake=8)
+m.compile(optfile='sverdrup_glwagner', npmake=8)
 m.run()

@@ -11,11 +11,11 @@ ntimesteps = 1000
 # Paths and parameters custom to Greg's system
 gcmpath = '/Users/glwagner/Numerics/pymitgcm/MITgcm'
 setuppath = os.path.join(os.getcwd(), '../../templates/verif_internalwave')
-optfilename = 'neve'
+optfile = 'neve'
 
 # Create and compile setup
 setup = pymitgcm.Setup(setuppath)
-setup.compilesetup(gcmpath, optfilename=optfilename)
+setup.compilesetup(gcmpath, optfile=optfile)
 
 # Get current ntimesteps
 oldntimesteps = setup.getparam('ntimesteps')

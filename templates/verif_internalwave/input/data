@@ -50,7 +50,7 @@
 # Time stepping parameters
  &PARM03
  nIter0=0,
- nTimeSteps=10
+ nTimeSteps=100
  deltaT=500.,
  abEps=0.1,
  pChkptFreq=0.,

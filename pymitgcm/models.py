@@ -1,5 +1,4 @@
-import os, shutil
-import os, time
+import os, shutil, time, glob, logging
 import numpy as np
 import f90nml
 
@@ -11,8 +10,12 @@ from .openboundaryconditions import OpenBoundaryCondition
 
 # Globals
 topofilename = 'topo.bin'
+gridfilenames = { 'dx': 'dx.bin', 'dy': 'dy.bin', 'dz': 'dz.bin' }
 validnamelists = ['data', 'data.pkg', 'data.obcs', 'data.mnc', 'data.exf', 
     'eedata', 'data.exch2']
+
+logger = logging.getLogger(name='models')
+logger.setLevel(0)
 
 
 
@@ -51,7 +54,7 @@ class Setup:
     def __init__(self, *args, init=False, clean=False, build=None, code=None, 
         input=None, run=None):
         """ Instantiate a setup directory tree. Keyword arguments that
-        correspond to elements of ._validdirs defined below will be 
+        correspond to elements of validsetupdirs defined below will be 
         assigned as attributes to the directory tree object. 
 
         Args:
@@ -75,17 +78,16 @@ class Setup:
     
         if len(args) > 1:
             raise TypeError("Expected at most 1 argument, got %d" % len(args))
-        elif len(args) is 0:
-            self.path = os.getcwd()
-        elif len(args) is 1:
-            self.path = os.path.abspath(args[0])
 
+        try:    self.path = os.path.abspath(args[0])
+        except: self.path = os.getcwd()
+
+        validsetupdirs = ['build', 'code', 'input', 'run']
         self.execname = 'mitgcmuv'
-        self._validdirs = ['build', 'code', 'input', 'run']
         self.dirs = []
 
         # Initialize the directory tree
-        for dir in self._validdirs:
+        for dir in validsetupdirs:
 
             try: # to use non-default keywords:
                 dirpath = os.path.join(self.path, locals()[dir])
@@ -101,7 +103,7 @@ class Setup:
             else:
                 setattr(self, dir, None)
 
-        for dir in self._validdirs:
+        for dir in validsetupdirs:
             if getattr(self, dir) is not None:
                 self.dirs.append(dir)
 
@@ -155,7 +157,8 @@ class Setup:
     def getinputfilenames(self):
         """ Extract key namelist parameters that correspond to filenames. """
 
-        filenameparams = ['delxfile', 'delyfile', 'delrfile']
+        filenameparams = ['delxfile', 'delyfile', 'delrfile', 
+            'delzfile', 'bathyfile']
         paramdict = self.buildparamdict()
 
         self.inputfilenames = {}
@@ -193,13 +196,13 @@ class Setup:
         return gcmutils.siftdict(param, self.buildparamdict())[0]
 
 
-    def setparam(self, param, value):
+    def setparam(self, param, value, checksize=True):
         """ Look through input namelists and SIZE.h in search of a parameter,
         find its namelist file and namelist, and change its value. """
         
         val, dpath, level = gcmutils.siftdict(param, self.buildparamdict())
 
-        if dpath[0] is 'size':
+        if dpath[0] is 'size' and checksize:
             gcmutils.changesizevars({param: value}, sizepath=self.input)
         else:
             self.editnamelist(dpath[0], dpath[1], param, value)
@@ -210,11 +213,13 @@ class Setup:
 
         patch = {namelist: {param: value}}
         namelistpath = os.path.join(self.input, namelistfile)
-        oldnamelistpath = namelistpath + '_old'
 
+        oldnamelistpath = namelistpath + '_temp'
         shutil.copy(namelistpath, oldnamelistpath)
         os.remove(namelistpath)
+
         f90nml.patch(oldnamelistpath, patch, namelistpath)
+        os.remove(oldnamelistpath)
      
 
     def hasexecutable(self):
@@ -233,39 +238,36 @@ class Setup:
         return hasexecutable
 
 
-    def runsetup(self, overwrite=False, params=None):
+    def runsetup(self, overwrite=False):
         """ Run the setup by invoking its executable. 
         
         Args:
             overwrite (bool): Overwrite existing input/output. If output exists,
                 runsetup(overwrite=False) will fail.
-
-            params (dict): Dictionary of {param: value} pairs to be changed
-                before running the setup.
         """
 
-        if params is not None:
-            pass
+        logger.info("Running a setup with properties:\n"
+          + "   nx, ny : {}, {}\n".format(self.nx, self.ny)
+          + "   nz     : {}\n".format(self.nz)
+          + "   nprun  : {}\n".format(self.nprun))
 
         starttime = time.time()
         msg = gcmutils.rungcm(self.run, inputpath=self.input,
             overwrite=overwrite)
 
-        print('Run time: {:.3f}'.format(time.time() - starttime))
-        print(msg.decode('utf-8'))    
+        logger.info("Run time: {:.3f}".format(time.time() - starttime))
+        logger.info(msg.decode('utf-8'))
 
 
-    def compilesetup(self, gcmpath, optfilename=None, npmake=1):
+    def compilesetup(self, gcmpath, optfile=None, npmake=1, mnc=True):
         """ Compile a setup.
     
         Args:
-            optfilename (str): Name of the optfile to use with genmake2
+            optfile (str): Name of the optfile to use with genmake2
+
             npmake (int): Number of processors to use during compilation
-            nprun (int): Number of processors the model will be run with. Used
-                to determine whether or not to compile the model with
-                mpi enabled.
-            mpi (bool): An flag alternative to specifying nprun that directs
-                genmake2 to compile with mpi enabled.
+    
+            mnc (bool): Whether or not to compile with NetCDF saving enabled.
         """
 
         self.getsize()
@@ -278,19 +280,33 @@ class Setup:
             os.makedirs(buildpath)
             self.build = buildpath
 
+        if mnc: mncmsg = 'Enabled'
+        else:   mncmsg = 'Disabled'
+
+        logger.info("Compiling MITgcm setup in {} with\n".format(self.path)
+          + "   nx, ny : {}, {}\n".format(self.nx, self.ny)
+          + "   nz     : {}\n".format(self.nz)
+          + "   nprun  : {}\n".format(self.nprun)
+          + "   npmake : {}\n".format(npmake)
+          + "      mnc : {}\n".format(mncmsg)
+          + "...\n\n")
+
         os.chdir(self.build)
 
         starttime = time.time()
-        gcmutils.genmake(gcmpath, optfilename=optfilename, mpi=mpi)
-        print('Genmake time: {:3f} s'.format(time.time()-starttime))
+        gcmutils.genmake(gcmpath, optfile=optfile, mpi=mpi, mnc=mnc)
+        logger.info("   Genmake completed in     {.3f} s".format(
+            time.time()-starttime))
             
         starttime = time.time()
         gcmutils.makedepend()
-        print('Make depend time: {:3f} s'.format(time.time()-starttime))
+        logger.info("   Make depend completed in {.3f} s".format(
+            time.time()-starttime))
 
         starttime = time.time()
         gcmutils.make(npmake=npmake)
-        print('Make time: {:3f} s'.format(time.time()-starttime))
+        logger.info("   Make completed in        {.3f} s".format(
+            time.time()-starttime))
 
         # Copy executable to run directory
         shutil.copy(os.path.join(self.build, self.execname),
@@ -305,17 +321,22 @@ class Setup:
 # M O D E L C L A S S 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< 
 class Model:
-    def __init__(self, templatepath=None, gcmpath=None):
-        """ Initialize an pymitgcm model. """
+    def __init__(self, templatepath, gcmpath=None, mnc=True):
+        """ Initialize an pymitgcm model. 
+
+        Args:
+            templatepath (str): Path to the model's template setup.
+        
+            gcmpath (str): Path to MITgcm to use to compile the model.
+            
+            mnc (bool): Whether or not to use NetCDF to save output.
+        """
+
+        self.template = Setup(os.path.abspath(templatepath))
 
         try:              self.gcmpath = os.path.abspath(gcmpath)
         except TypeError: self.gcmpath = os.environ['MITGCMPATH']
         except KeyError:  pass
-
-        try:              templatepath = os.path.abspath(templatepath)
-        except TypeError: templatepath = os.getcwd()
-
-        self.template = Setup(templatepath)
 
         # Initialize namelist patch
         self.namelists = {
@@ -325,64 +346,130 @@ class Model:
                 'parm04': {},       # Gridding
                 'parm05': {},       # Bathymetry initial condition files
             },
+            'data.pkg': {
+                'packages': {},     # Packages to load
+            }, 
         }
 
         # Convenience names for common namelists.
         self.eqns  = self.namelists['data']['parm01']
         self.grid  = self.namelists['data']['parm04']
         self.files = self.namelists['data']['parm05']
-        self.timestepper = self.namelists['data']['parm03']
+        self.time  = self.namelists['data']['parm03']
+        self.pkgs  = self.namelists['data.pkg']['packages']
+        self.size  = {}
+
+        self.mnc = mnc
 
 
-    def run(self, overwrite=False, optfilename=None, npmake=1):
-        """ Run the model. """
+    def run(self, overwrite=False, remove=None, compile=False, optfile=None, 
+        npmake=1):
+        """ Run the model. 
 
-        if not self.setup.iscompiled(): 
-            self.compile(optfilename=optfilename, npmake=npmake)
+        Args:
+            overwrite (bool): Whether or not to overwrite input
+                in the run directory. Included for safety so that files
+                are not erased accidentally.
 
+            remove (list): List of strings and string patterns specifying files
+                to remove from run directory before running the model.
+
+            compile (bool): Whether or not to compile the executable prior
+                to running.
+
+            optfile (str): Name of the optfile to be used when
+                compiling the model. Only used if compile=True.
+
+            npmake (int): Number of processors to use during compilation.
+                Only used if compile=True.
+        """
+
+        output = 'run.info'
+        defaultremove = ['grid*', 'monitor*', 'phiHyd*', output]
+
+        if remove is None:
+            remove = defaultremove
+        else:
+            try:
+                remove = remove + defaultremove
+            except TypeError: # because 'remove' is not a list
+                remove = [remove] + defaultremove
+
+        for pattern in remove:
+            for filename in glob.glob(os.path.join(self.setup.run, pattern)):
+                try:    os.remove(filename)
+                except: pass
+
+        if compile:
+            self.compile(optfile=optfile, npmake=npmake)
+
+        logger.setLevel(20)
+        logger.error("\nExecuting MITgcm setup:\n"
+          + "   Setup path : {}\n".format(self.setup.path)
+          + "   nx, ny, nz : {}, {}, {}\n".format(self.nx, self.ny, self.nz)
+          + "        nprun : {}\n".format(self.nprun)
+          + "   ntimesteps : {}\n".format(self.setup.getparam('ntimesteps'))
+          + "       deltaT : {}\n\n".format(self.setup.getparam('deltat'))
+          + "Running...")
+     
         starttime = time.time()
         msg = gcmutils.rungcm(self.setup.run, inputpath=self.setup.input, 
-            overwrite=overwrite)
+            overwrite=overwrite, outputname=output)
 
-        print('Run time: {:.3f}'.format(time.time() - starttime))
-        print(msg.decode('utf-8'))    
+        logger.error("  Run completed in {:.3f} s.\n".format(
+            time.time()-starttime))
+        logger.error("MITgcm messages: \n{}".format(msg.decode('utf-8')))
 
 
-    def compile(self, optfilename=None, npmake=1):
+    def compile(self, optfile=None, npmake=1):
         """ Compile the model. 
     
         Args:
-            optfilename (str): Name of the optfile to use with genmake2
+            optfile (str): Name of the optfile to use with genmake2
+
             npmake (int): Number of processors to use during compilation
-            nprun (int): Number of processors the model will be run with. Used
-                to determine whether or not to compile the model with
-                mpi enabled.
-            mpi (bool): An flag alternative to specifying nprun that directs
-                genmake2 to compile with mpi enabled.
         """
 
         # The setup filestructure and setup attribute must be 
         # initialized to compile the model.
+        shutil.rmtree(self.setup.build)
+        os.makedirs(self.setup.build)
         os.chdir(self.setup.build)
 
-        if self.nprun > 1: mpi=True
-        else:              mpi=False
+        mpi = True if self.nprun > 1 else False
+
+        logger.setLevel(20)
+        logger.error("\nInitiating compilation of MITgcm setup:\n"
+          + "   Setup path : {}\n".format(self.setup.path)
+          + "  MITgcm path : {}\n".format(self.gcmpath)
+          + "   nx, ny, nz : {}, {}, {}\n".format(self.nx, self.ny, self.nz)
+          + "        nprun : {}\n".format(self.nprun)
+          + "       npmake : {}\n".format(npmake)
+          + "          mnc : {}\n\n".format('Yes' if self.mnc else 'No')
+          + "Compiling...")
             
-        starttime = time.time()
-        gcmutils.genmake(self.gcmpath, optfilename=optfilename, mpi=mpi)
-        print('Genmake time: {:3f} s'.format(time.time()-starttime))
+        totaltime, starttime = time.time(), time.time()
+        gcmutils.genmake(self.gcmpath, optfile=optfile, mpi=mpi, mnc=self.mnc)
+        logger.error("           Genmake2 completed in {:7.3f} s...".format(
+            time.time()-starttime))
             
         starttime = time.time()
         gcmutils.makedepend()
-        print('Make depend time: {:3f} s'.format(time.time()-starttime))
+        logger.error("        Make depend completed in {:7.3f} s...".format(
+            time.time()-starttime))
 
         starttime = time.time()
         gcmutils.make(npmake=npmake)
-        print('Make time: {:3f} s'.format(time.time()-starttime))
+        logger.error("               Make completed in {:7.3f} s...".format(
+            time.time()-starttime))
 
         # Copy executable to run directory
         shutil.copy(os.path.join(self.setup.build, 'mitgcmuv'),
             os.path.join(self.setup.run, ''))
+
+
+        logger.error("Build complete. Total build time {:7.3f} s.\n".format(
+            time.time()-totaltime))
 
 
     def init_ic(self):
@@ -390,11 +477,11 @@ class Model:
         self.ic = InitialCondition(self)
 
 
-    def init_obcs(self, edges):
+    def init_obcs(self, edges, nt=1):
         """ Initialize open boundary conditions. """
         self.obcs = {}
         for edge in edges:
-            self.obcs[edge] = OpenBoundaryCondition(self, edge)
+            self.obcs[edge] = OpenBoundaryCondition(self, edge, nt=nt)
 
 
     def set_thetaref(self, Tref=None):
@@ -404,17 +491,9 @@ class Model:
             self.Tref = Tref
         elif hasattr(self, 'ic') and 'T' in self.ic.fields.keys():
             self.Tref = self.ic.fields['T'].mean(axis=(0, 1))
-        elif hasattr(self, 'obcs'):
-            for obc in self.obcs.keys():
-                if 'T' in self.obcs[obc].fields.keys():
-                    if not hasattr(self, 'Tref'):
-                        self.Tref = self.obcs[obc].fields['T'].mean(axis=0)
-                    else:
-                        self.Tref = np.concatenate(
-                            (self.Tref, self.obcs[obc].fields['T'].mean(axis=0)))
-
+       
         if not hasattr(self, 'Tref'):
-            self.Tref = np.zeros((self.nz,))
+            self.Tref = [0.0]*self.nz
 
         self.Tref = gcmutils.truncate(self.Tref, digits=4)
 
@@ -426,37 +505,38 @@ class Model:
             self.Sref = Sref
         elif hasattr(self, 'ic') and 'S' in self.ic.fields.keys():
             self.Sref = self.ic.fields['S'].mean(axis=(0, 1))
-        elif hasattr(self, 'obcs'):
-            for obc in self.obcs.keys():
-                if 'S' in self.obcs[obc].fields.keys():
-                    if not hasattr(self, 'Sref'):
-                        self.Sref = self.obcs[obc].fields['S'].mean(axis=0)
-                    else:
-                        self.Sref = np.concatenate(
-                            (self.Sref, self.obcs[obc].fields['S'].mean(axis=0)))
-
+        
         if not hasattr(self, 'Sref'):
-            self.Sref = 35.0*np.ones((self.nz,))
+            self.Sref = [35.0]*self.nz
 
         self.Sref = gcmutils.truncate(self.Sref, digits=5)
 
 
-    def updatesizevars(self, nprun=None):
-        """ Push essential fields into the model's sizevars attribute. """
+    def updatesize(self, nprun=None):
+        """ Push essential fields into the model's size attribute. """
 
-        # Initialize
-        if nprun is None: nprun = 1
-        if not hasattr(self, 'sizevars'): self.sizevars = {}
+        if nprun is not None:
+            self.nprun = nprun
+
+        # Horizontal tiling
+        try:
+            self.tiling = gcmutils.getcompacttiling(self.nx, self.nx, self.nprun)
+            
+            self.size['sNx'] = int(self.nx/self.tiling[0])
+            self.size['sNy'] = int(self.ny/self.tiling[1])
+            self.size['nSx'] = self.tiling[0]
+            self.size['nSy'] = self.tiling[1]
+            self.size['nPx'] = self.tiling[0]
+            self.size['nPy'] = self.tiling[1]
+
+        except TypeError:    
+            raise ValueError(
+                "The grid nx, ny = {}, {}".format(self.nx, self.ny)
+              + " has no valid tiling for np = {}.".format(nprun))
 
         # Vertical grid
-        self.sizevars['Nr'] = self.nz
-
-        # Parallelism
-        if self.nx % nprun == 0.0:
-            self.sizevars['sNx'] = int(self.nx/nprun)
-            self.sizevars['nSx'] = int(nprun)
-            self.sizevars['nPx'] = int(nprun)
-
+        self.size['Nr'] = self.nz
+                        
 
     def updatenamelists(self):
         """ Push essential fields into the model's namelists attribute. """
@@ -469,10 +549,9 @@ class Model:
         if hasattr(self, 'Tref'): self.eqns['Tref'] = list(self.Tref)
         if hasattr(self, 'Sref'): self.eqns['Sref'] = list(self.Sref)
 
-        # TODO: detect properties of template setup and choose setup accordingly.
-        #self.grid['delx'] = list(self.dx)
-        #self.grid['dely'] = list(self.dy)
-        #self.grid['delz'] = list(self.dz)
+        self.grid['delxfile'] = gridfilenames['dx']
+        self.grid['delyfile'] = gridfilenames['dy']
+        self.grid['delz']     = list(self.dz)
 
         # Names of the topography file
         if hasattr(self, 'topo'):
@@ -484,33 +563,49 @@ class Model:
                 self.files[self.ic.namelistnames[var]] = self.ic.filenames[var]
                     
         if hasattr(self, 'obcs'):
-            self.namelists['data.pkg'] = { 'packages': { 'useobcs': True } }
-            self.namelists['data.obcs'] = { 'obcs_parm01' : {} }
+            self.pkgs['useobcs'] = True
 
+            self.namelists['data.obcs'] = { 'obcs_parm01' : {} }
+            self.obparams = self.namelists['data.obcs']['obcs_parm01']
+            #self.sponge   = self.namelists['data.obcs']['obcs_parm02']
+
+            obc0 = self.obcs.values()[0]
+            if obc0.nt > 1: 
+                self.time['periodicexternalforcing'] = True 
+                self.time['externforcingperiod'] = obc0.dt
+                self.time['externforcingcycle'] = obc0.dt*obc0.nt
+            else:
+                self.time['periodicexternalforcing'] = False
+           
             for obc in self.obcs.keys():
 
                 if obc is 'east' or obc is 'west':      idx = 'I'
                 elif obc is 'south' or obc is 'north':  idx = 'J'
 
-                #self.namelists['data.obcs']['obcs_parm01'][
-                #    'ob_'+idx+obc] = list(getattr(self.obcs[obc], idx))
+                self.obparams['ob_'+idx+obc] = list(getattr(self.obcs[obc], idx))
 
                 for var in self.obcs[obc].fields.keys():
                     self.namelists['data.obcs']['obcs_parm01'][
                         self.obcs[obc].namelistnames[var]] = (
                         self.obcs[obc].filenames[var] )    
 
-        # Assume we are using MNC and set default vars --- for now.
-        self.namelists['data.mnc'] = { 'mnc_01': {} }
-        self.namelists['data.mnc']['mnc_01'] = {'mnc_use_outdir'  : False}
-        self.namelists['data.mnc']['mnc_01'] = {'monitor_mnc'     : False}
-        self.namelists['data.mnc']['mnc_01'] = {'pickup_read_mnc' : False}
-        self.namelists['data.mnc']['mnc_01'] = {'pickup_write_mnc': False}
+        if self.mnc:
+            self.pkgs['usemnc'] = True
+            self.namelists['data.mnc'] = { 'mnc_01': {} }
+            self.namelists['data.mnc']['mnc_01'] = {'mnc_use_outdir'  : False}
+            self.namelists['data.mnc']['mnc_01'] = {'monitor_mnc'     : False}
+            self.namelists['data.mnc']['mnc_01'] = {'pickup_read_mnc' : False}
+            self.namelists['data.mnc']['mnc_01'] = {'pickup_write_mnc': False}
 
 
     def saveinput(self):
         """ Save available grid files, initial conditions, and boundary 
         conditions to disk. """
+
+        # Grid
+        gridvars = { gridfilenames['dx']: self.dx,
+                     gridfilenames['dy']: self.dy }
+        gcmutils.savegcminput(gridvars, self.setup.input)
 
         # Topography
         if hasattr(self, 'topo'):
@@ -526,7 +621,7 @@ class Model:
                 self.obcs[obc].save(self.setup.input)
 
 
-    def gensetup(self, namepatch=None, nprun=1, templatepath=None, 
+    def gensetup(self, namepatch=None, params=None, templatepath=None, 
         setuppath=None, cleansetup=False):
         """ Generate the MITgcm setup for the process model using a template
         setup.
@@ -536,11 +631,11 @@ class Model:
                 namepatch[namelistfilename][namelist][variable] = value.
                 If specified, it will be merged with the existing default.
 
-            nprun (int): Number of processors for the run.
-
-            templatepath (str): Path to a pymitgcm template directory with
-                /namelist and /code subdirectories. If 'None', defaults to 
-                the attribute self.templatepath, which must exist.
+            params (dict): A dictionary of parameters with the form 
+                {paramname: value}. Each paramname is looked up in the 
+                template namelists and, if found, changed to value.
+                Each param must have a pre-existing template value for any 
+                change to take place.
 
             setuppath (str): Path to the working directory in which to put
                 the setup.
@@ -552,30 +647,23 @@ class Model:
         if namepatch is not None: 
             self.namelists = {**namepatch, **self.namelists}
 
-        if templatepath is not None:    
-            self.template = Setup(templatepath)
-        elif not hasattr(self, 'template'):
-            raise RunTimeError("No template has been specified for the model.")
         
-        if self.nx % nprun != 0:
-            raise ValueError("Number of grid points must be a mulitple of the "
-                "number of run processes.")
-        else:
-            self.nprun = nprun
-
         self.setup = Setup(setuppath, init=True, clean=cleansetup)
         self.saveinput()
         self.updatenamelists()
-        self.updatesizevars(nprun=nprun)
-            
-        # Copy template
-        for dir in self.template.dirs:
-            for filename in os.listdir(getattr(self.template, dir)):
-                shutil.copy(
-                    os.path.join(getattr(self.template, dir), filename),
-                    os.path.join(getattr(self.setup, dir), filename))
+        self.updatesize()
 
-        gcmutils.changesizevars(self.sizevars, sizepath=self.setup.code)
+        # Copy template
+        dontcopylist = ['.swp', 'mitgcmuv']
+        for dir in ['code', 'input']:
+            for filename in os.listdir(getattr(self.template, dir)):
+                if not any(bad in filename for bad in dontcopylist):
+                    shutil.copy(
+                        os.path.join(getattr(self.template, dir), filename),
+                        os.path.join(getattr(self.setup, dir), filename))
+
+        # Change size vars
+        gcmutils.changesizevars(self.size, sizepath=self.setup.code)
 
         # Merge template namelists with model namelist
         fullnamelists = {}
@@ -583,13 +671,23 @@ class Model:
 
             # Load namelist files from template directory, not newly-created
             # setup
-            fullnamelists[nmlfile] = f90nml.read(
-                os.path.join(template['input'], nmlfile))
+            try:
+                fullnamelists[nmlfile] = f90nml.read(
+                    os.path.join(self.template.input, nmlfile))
+            except FileNotFoundError:
+                fullnamelists[nmlfile] = f90nml.Namelist(self.namelists[nmlfile])
 
+            # Paste-in new vars
             for nml in self.namelists[nmlfile].keys():
                 for var in self.namelists[nmlfile][nml].keys():
                     fullnamelists[nmlfile][nml][var] = (
                         self.namelists[nmlfile][nml][var])
+
+        # Homogenize references to 'r' or 'z' in data namelist
+        fullnamelists['data'] = gcmutils.correctdatanamelist(
+            fullnamelists['data'], correctto='z')
+
+        fullnamelists = self.trimnamelists(fullnamelists)
 
         # Save namelists
         for filename in fullnamelists.keys():
@@ -597,14 +695,77 @@ class Model:
             with open(savename, 'w') as namefile:
                 fullnamelists[filename].write(savename, force=True)
 
+        # Change parameters
+        if params is not None:
+            for param, value in params.items():
+                self.setup.setparam(param, value, checksize=False)
 
 
+    def trimnamelists(self, namelists):
+        """ Trim spurious parameters from namelists. """    
 
+        # Shortcuts
+        eqns = namelists['data']['parm01']
+
+
+        # Compatabilities in the continuous equation params.
+        try:
+            if eqns['rigidlid']: # No free surface evolution
+                eqns['implicitfreesurface'] = False
+                eqns['exactconserv'] = False
+        except: 
+            pass
+
+        # This code uses only delxfile, delyfile, and delz
+        for gridvar in ['delx', 'dely', 'delr']:
+            try:    namelists['data']['parm04'].pop(gridvar)
+            except: pass
+        
+        # Initial condition params
+        icnames = { 
+            'U': 'uvelinitfile', 
+            'V': 'vvelinitfile', 
+            'W': 'wvelinitfile', 
+            'T': 'hydrogthetafile', 
+            'S': 'hydrogsaltfile', 
+        } 
+
+        if hasattr(self, 'ic'):
+            for var in icnames.keys():
+                if var not in self.ic.fields.keys():
+                    try:    namelists['data']['parm05'].pop(icnames[var])
+                    except: pass
+
+        # OBCS params
+        edges = ['north', 'south', 'east', 'west']
+        vars = ['U', 'V', 'W', 'T', 'S']
+
+        if hasattr(self, 'obcs') and 'data.obcs' in namelists.keys():
+            obparams = namelists['data.obcs']['obcs_parm01']
+            for edge in edges:
+
+                if   edge is 'north' or edge is 'south': idx = 'J'
+                elif edge is 'west'  or edge is 'east' : idx = 'I'
+
+                if edge not in self.obcs.keys():
+                    param = 'ob_' + idx + edge
+                    try:    obparams.pop(param)
+                    except: pass
+
+                for v in vars:
+                    try: 
+                        _ = self.obcs[edge].fields[v].shape
+                    except:
+                        param = 'ob' + edge[0] + v + 'file'
+                        try:    obparams.pop(param)
+                        except: pass
+
+        return namelists
 
 
 class RectangularModel(Model):
-    def __init__(self, nx, ny, nz, Lx, Ly, Lz, gcmpath=None, 
-        templatepath=None):
+    def __init__(self, nx, ny, nz, Lx, Ly, Lz, templatepath, 
+        nprun=1, gcmpath=None, mnc=True):
         """ Instantiate a rectangular MITgcm model on a Cartesian grid. 
         
         Args:
@@ -613,33 +774,48 @@ class RectangularModel(Model):
 
             Lx, Ly, Lz: Extent of the model domain in x, y, and z.
 
-            gcmpath: Path to local version of MITgcm. If unset, gcmpath defaults
-                to the path '../MITgcm' if it exists.
+            templatepath (str): Path to the model's template setup.
+
+            gcmpath (str): Path to local version of MITgcm. If unset, gcmpath 
+                defaults to the path '../MITgcm' if it exists.
         """
 
-        Model.__init__(self, templatepath=templatepath, gcmpath=gcmpath)
+        Model.__init__(self, templatepath, gcmpath=gcmpath, mnc=mnc)
 
         self.Lx, self.Ly, self.Lz = Lx, Ly, Lz
         self.nx, self.ny, self.nz = nx, ny, nz
+
+        self.updatesize(nprun=nprun)
             
         self.grid['usingcartesiangrid'] = True
         self.initgrid()
 
 
     def initgrid(self):
-        """ Initialize the grid for a two-dimensional model in x, z """
+        """ Initialize the grid for a model in Cartesian x,y,z-space. """
 
         self.dx = gcmutils.truncate(self.Lx/self.nx) * np.ones((self.nx,))
         self.dy = gcmutils.truncate(self.Ly/self.ny) * np.ones((self.ny,))
         self.dz = gcmutils.truncate(self.Lz/self.nz) * np.ones((self.nz,))
 
-        self.x = self.dx.cumsum()
-        self.y = self.dy.cumsum()
+        # Horizontal grid variables
+        self.xg = np.concatenate(([0.0], self.dx.cumsum()))
+        self.yg = np.concatenate(([0.0], self.dy.cumsum()))
+            
+        self.x = 0.5*(self.xg[1:]+self.xg[0:-1])
+        self.y = 0.5*(self.yg[1:]+self.yg[0:-1])
 
-        zf = np.concatenate(([0.0], -gcmutils.truncate(self.dz.cumsum())))
+        # For reference
+        self.xc = self.x
+        self.yc = self.y
+        self.xu = self.xg
+        self.yu = self.yc
+        self.xv = self.xc
+        self.yv = self.yg
 
-        self.z = 0.5*(zf[0:-1] + zf[1:])
+        # Vertical grid
+        self.zf = np.concatenate(([0.0], -self.dz.cumsum()))
+        self.z = 0.5*(self.zf[0:-1] + self.zf[1:])
+        self.zc = self.z
 
-        self.Y, self.X = np.meshgrid(self.y, self.x)
-
-
+        self.Y, self.X, self.Z = np.meshgrid(self.y, self.x, self.z)

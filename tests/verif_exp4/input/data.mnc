@@ -1,0 +1,3 @@
+&mnc_01
+    pickup_write_mnc = .false.
+/

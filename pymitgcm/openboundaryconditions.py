@@ -6,13 +6,31 @@ from . import gcmutils
 
 
 class OpenBoundaryCondition:
-    def __init__(self, model, edge):
-        """ Instantiate an open boundary condition for an MITgcm model. """
+    def __init__(self, model, edge, nt=1, dt=None):
+        """ Instantiate an open boundary condition for an MITgcm model. 
 
+        Args:
+            model: The pymitgcm.Model to which the obc's belong.
+    
+            edge (str): The edge of the obcs (either south, north, west, 
+                or east).
+
+            nt (int): The number of time-points on the obc.
+        """
 
         filenameform = 'obc_{}_{}.bin'
         namelistform = 'ob{}{}file'
         varlist = ['U', 'V', 'W', 'T', 'S']
+
+        self.nt = nt
+        if nt > 1: 
+            if dt is None:
+                raise ValueError("Open boundary condition dt must be set if "
+                    "nt > 1. dt is the interval between open boundary time "
+                    "slices.")
+            else:
+                self.dt = dt
+                
 
         self.namelistnames, self.filenames = {}, {}
         for var in varlist:
@@ -22,24 +40,23 @@ class OpenBoundaryCondition:
         if edge is 'south':
             self.n = model.x
             self.nn = model.nx
-            self.I = np.arange(0, model.nx)
-            self.J = np.zeros((model.nx,), dtype=np.int64)
+            self.I = np.arange(1, model.nx+1)
+            self.J = np.ones((model.nx,), dtype=np.int64)
         elif edge is 'north':
             self.n = model.x
             self.nn = model.nx
-            self.I = np.arange(0, model.nx)
-            self.J = (model.ny-1) * np.ones((model.nx,), dtype=np.int64)
+            self.I = np.arange(1, model.nx+1)
+            self.J = model.ny * np.ones((model.nx,), dtype=np.int64)
         elif edge is 'west':
             self.n = model.y
             self.nn = model.ny
-            self.I = np.zeros((model.ny,), dtype=np.int64)
-            self.J = np.arange(0, model.ny)
+            self.I = np.ones((model.ny,), dtype=np.int64)
+            self.J = np.arange(1, model.ny+1)
         elif edge is 'east':
             self.n = model.y
             self.nn = model.ny
-            self.I = (model.nx-1) * np.ones((model.ny,), dtype=np.int64)
-            self.J = np.arange(0, model.ny)
-
+            self.I = model.nx * np.ones((model.ny,), dtype=np.int64)
+            self.J = np.arange(1, model.ny+1)
 
         self.model = model
         self.edge = edge
@@ -47,7 +64,7 @@ class OpenBoundaryCondition:
         self.fields = {}
 
 
-    def save(self, savedir):
+    def save(self, savepath):
         """ Save open boundary condition as binary file in MITgcm format. """
     
         # Build savevars dictionary
@@ -56,13 +73,13 @@ class OpenBoundaryCondition:
         for varname, var in self.fields.items():
             savevars[self.filenames[varname]] = var
 
-        gcmutils.savegcminput(savevars, savedir=savedir)
+        gcmutils.savegcminput(savevars, savepath=savepath)
 
 
     def add_uvel(self, U):
         """ Set the eastward velocity of the open boundary condition. """
         if 'U' not in self.fields.keys():
-            self.fields['U'] = np.zeros((self.nn, self.nz)) + U
+            self.fields['U'] = np.zeros((self.nn, self.nz, self.nt)) + U
         else:
             self.fields['U'] = self.fields['U'] + U
         self.fields['U'] = self.fields['U'].squeeze()
@@ -71,16 +88,25 @@ class OpenBoundaryCondition:
     def add_vvel(self, V):
         """ Set the northward velocity of the open boundary condition. """
         if 'V' not in self.fields.keys():
-            self.fields['V'] = np.zeros((self.nn, self.nz)) + V
+            self.fields['V'] = np.zeros((self.nn, self.nz, self.nt)) + V
         else:
             self.fields['V'] = self.fields['V'] + V
         self.fields['V'] = self.fields['V'].squeeze()
 
 
+    def add_wvel(self, W):
+        """ Set the northward velocity of the open boundary condition. """
+        if 'W' not in self.fields.keys():
+            self.fields['W'] = np.zeros((self.nn, self.nz, self.nt)) + W
+        else:
+            self.fields['W'] = self.fields['W'] + W
+        self.fields['W'] = self.fields['W'].squeeze()
+
+
     def add_theta(self, T):
         """ Set the temperature distribution the open boundary condition. """
         if 'T' not in self.fields.keys():
-            self.fields['T'] = np.zeros((self.nn, self.nz)) + T
+            self.fields['T'] = np.zeros((self.nn, self.nz, self.nt)) + T
         else:
             self.fields['T'] = self.fields['T'] + T
         self.fields['T'] = self.fields['T'].squeeze()
@@ -89,7 +115,7 @@ class OpenBoundaryCondition:
     def add_salt(self, S):
         """ Set the salinity distribution the open boundary condition. """
         if 'S' not in self.fields.keys():
-            self.fields['S'] = np.zeros((self.nn, self.nz)) + S
+            self.fields['S'] = np.zeros((self.nn, self.nz, self.nt)) + S
         else:
             self.fields['S'] = self.fields['S'] + S
         self.fields['S'] = self.fields['S'].squeeze()
@@ -100,4 +126,5 @@ class OpenBoundaryCondition:
 
         for fieldname, field in ic.fields.items():
             self.fields[fieldname] = field[self.I, self.J, :].squeeze()
+            self.fields[fieldname] *= np.ones((self.nn, self.nz, self.nt))
 

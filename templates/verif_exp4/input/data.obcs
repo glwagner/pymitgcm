@@ -1,7 +1,9 @@
 # Open-boundaries
- &OBCS_PARM01
+#OBWuFile = 'OBzonalU.bin',
+#OBEuFile = 'OBzonalU.bin',
 # This flag turns off checking and fixing problematic topography across 
 # open boundaries.
+ &OBCS_PARM01
  OBCSfixTopo=.FALSE.,
  OB_Jnorth= 80*-1,
  OB_Jsouth= 80*1,
@@ -10,8 +12,6 @@
  useOBCSprescribe = .TRUE.,
  OBNuFile = 'OBmeridU.bin',
  OBSuFile = 'OBmeridU.bin',
-#OBWuFile = 'OBzonalU.bin',
-#OBEuFile = 'OBzonalU.bin',
  OBWuFile = 'OB_WestU.bin',
  OBEuFile = 'OB_EastU.bin',
  OBWwFile = 'OBzonalW.bin',
@@ -22,7 +22,7 @@
  &
 
 # Orlanski parameters
- &OBCS_PARM02
 #Cmax=0.45,
 #cVelTimeScale=1000.,
+ &OBCS_PARM02
  &
