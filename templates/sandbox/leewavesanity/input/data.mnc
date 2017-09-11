@@ -1,6 +1,0 @@
-&mnc_01
-    mnc_use_outdir = .false.
-    monitor_mnc = .false.
-    pickup_read_mnc = .false.
-    pickup_write_mnc = .false.
-/
