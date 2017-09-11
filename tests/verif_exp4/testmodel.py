@@ -73,7 +73,3 @@ m.obcs['west'].fields['S'] = swest
 m.gensetup(cleansetup=False, params=params)
 m.run(overwrite=True, 
     compile=True, npmake=2, optfile='neve', remove=['*.nc'])
-
-# Initial condition
-
-
