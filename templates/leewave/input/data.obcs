@@ -10,7 +10,7 @@
  &
 
 # Orlanski parameters
-#Cmax=0.45,
-#cVelTimeScale=1000.,
  &OBCS_PARM02
+Cmax=0.45,
+cVelTimeScale=1000.,
  &

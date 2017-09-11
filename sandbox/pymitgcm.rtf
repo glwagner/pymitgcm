@@ -1,0 +1,33 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1404\cocoasubrtf470
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 pymitgcm to do\
+\
+examples:\
+	1. 2D lee waves and 2D internal tides.\
+	2. 2D near-inertial wave in jet for IC?\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 	3. Gravity current / plume for 2D surface forcing demonstration\
+	4. 3D baroclinic turbulence in channel forced at surface (Abernathy\'85)\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+\cf0 \
+\
+things to test:\
+	1. running a setup with a few parameters changed (but no change of grid)\
+		- lee wave should be fine for that\
+	2. initial value problem (changing grid + initial condition)\
+		- 2D near-inertial wave in random flow\
+	3. topography (changing grid / shape)\
+		- lee wave problem; or add topography to NIW problem\
+	4. open boundary condition problem (constant obc\'92s, change grid + obc size)\
+		- lee wave problem\
+	5. time-dependent open boundary condition / tidal open boundary condition\
+		- tides on a gaussian bump\
+	6. external forcing (heat, salt, momentum, pressure)\
+		- gravity current / convection?\
+		- channel flow spin up (expensive simulation)\
+	7. parallelism / tiling\
+		- channel flow spin up}

@@ -437,6 +437,7 @@ class Model:
         os.chdir(self.setup.build)
 
         mpi = True if self.nprun > 1 else False
+        withobcs = True if self.pkgs['useobcs'] else False
 
         logger.setLevel(20)
         logger.error("\nInitiating compilation of MITgcm setup:\n"
@@ -445,11 +446,13 @@ class Model:
           + "   nx, ny, nz : {}, {}, {}\n".format(self.nx, self.ny, self.nz)
           + "        nprun : {}\n".format(self.nprun)
           + "       npmake : {}\n".format(npmake)
-          + "          mnc : {}\n\n".format('Yes' if self.mnc else 'No')
-          + "Compiling...")
+          + "          mnc : {}\n".format('Yes' if self.mnc else 'No')
+          + "         obcs : {}\n".format('Yes' if withobcs else 'No')
+          + "\nCompiling...")
             
         totaltime, starttime = time.time(), time.time()
-        gcmutils.genmake(self.gcmpath, optfile=optfile, mpi=mpi, mnc=self.mnc)
+        gcmutils.genmake(self.gcmpath, optfile=optfile, mpi=mpi, mnc=self.mnc, 
+            obcs=withobcs)
         logger.error("           Genmake2 completed in {:7.3f} s...".format(
             time.time()-starttime))
             
@@ -477,11 +480,74 @@ class Model:
         self.ic = InitialCondition(self)
 
 
-    def init_obcs(self, edges, nt=1):
+    def init_obcs_namelists(self):
+        """ Initialize the obcs namelists. """
+        if 'data.obcs' not in self.namelists.keys():
+            self.namelists['data.obcs'] = { 'obcs_parm01' : {},
+                                            'obcs_parm02' : {}  }
+
+        try:
+            self.obparams = self.namelists['data.obcs']['obcs_parm01']
+        except KeyError:
+            self.namelists['data.obcs']['obcs_parm01'] = {}
+            self.obparams = self.namelists['data.obcs']['obcs_parm01']
+
+        try:
+            self.orlanski = self.namelists['data.obcs']['obcs_parm02']
+        except KeyError:
+            self.namelists['data.obcs']['obcs_parm02'] = {}
+            self.orlanski = self.namelists['data.obcs']['obcs_parm02']
+
+
+    def init_obcs(self, edges, nt=1, dt=None, copyic=None, orlanski=False, 
+        balanced=True):
         """ Initialize open boundary conditions. """
+
+        self.init_obcs_namelists()
+        self.obparams['useobcsbalance'] = True if balanced else False
+
         self.obcs = {}
         for edge in edges:
-            self.obcs[edge] = OpenBoundaryCondition(self, edge, nt=nt)
+            self.obcs[edge] = OpenBoundaryCondition(self, edge, nt=nt, dt=dt,
+                copyic=copyic, orlanski=orlanski)
+        
+
+    def init_obcs_sponge(self, thickness, urelaxbound=0.0, vrelaxbound=0.0,
+        urelaxinner=0.0, vrelaxinner=0.0):
+        """ Initialize an obcs sponge layer. Sponge layers damp velocities
+        normal to openboundaries; thus a 'urelax' parameter controls 
+        east-west boundaries and a 'vrelax' parameter control north-south.
+
+        Args:
+            thickness (int): Thickness of the sponge layer in grid points.
+                Sets the 'spongethickness' obcs parameter.
+
+            urelaxinner (float): relaxation time scale at the innermost sponge
+                layer point of an east-west open boundary. Sets the
+                'urelaxobcsinner' obcs parameter.
+
+            vrelaxinner (float): relaxation time scale at the innermost sponge
+                layer point of a north-south open boundary. Sets the
+                'vrelaxobcsinner' obcs parameter.
+
+            urelaxbound (float): relaxation time scale at the outermost sponge
+                layer point of an east-west open boundary. Sets the
+                'urelaxobcsbound' obcs parameter.
+
+            vrelaxbound (float): relaxation time scale at the outermost sponge
+                layer point of a north-south open boundary. Sets the
+                'vrelaxobcsbound' obcs parameter.
+        """
+
+        self.namelists['data.obcs'] = { 'obcs_parm03': {} }
+        self.sponge = self.namelists['data.obcs']['obcs_parm03']
+
+        self.sponge['spongethickness'] = thickness
+
+        self.sponge['urelaxobcsinner'] = urelaxinner
+        self.sponge['vrelaxobcsinner'] = vrelaxinner
+        self.sponge['urelaxobcsbound'] = urelaxbound
+        self.sponge['vrelaxobcsbound'] = vrelaxbound
 
 
     def set_thetaref(self, Tref=None):
@@ -520,7 +586,8 @@ class Model:
 
         # Horizontal tiling
         try:
-            self.tiling = gcmutils.getcompacttiling(self.nx, self.nx, self.nprun)
+            self.tiling = gcmutils.getcompacttiling(
+                self.nx, self.nx, self.nprun)
             
             self.size['sNx'] = int(self.nx/self.tiling[0])
             self.size['sNy'] = int(self.ny/self.tiling[1])
@@ -563,13 +630,12 @@ class Model:
                 self.files[self.ic.namelistnames[var]] = self.ic.filenames[var]
                     
         if hasattr(self, 'obcs'):
+
             self.pkgs['useobcs'] = True
+            self.init_obcs_namelists()
 
-            self.namelists['data.obcs'] = { 'obcs_parm01' : {} }
-            self.obparams = self.namelists['data.obcs']['obcs_parm01']
-            #self.sponge   = self.namelists['data.obcs']['obcs_parm02']
-
-            obc0 = self.obcs.values()[0]
+            # Ensure property specification of obcs time-dependence        
+            obc0 = [obc for obc in self.obcs.values()][0]
             if obc0.nt > 1: 
                 self.time['periodicexternalforcing'] = True 
                 self.time['externforcingperiod'] = obc0.dt
@@ -577,17 +643,28 @@ class Model:
             else:
                 self.time['periodicexternalforcing'] = False
            
+            # Set obcs params
             for obc in self.obcs.keys():
 
                 if obc is 'east' or obc is 'west':      idx = 'I'
                 elif obc is 'south' or obc is 'north':  idx = 'J'
 
                 self.obparams['ob_'+idx+obc] = list(getattr(self.obcs[obc], idx))
+                if self.obcs[obc].orlanski:
+                    self.obparams['useorlanski'+obc] = True
+                    # Default cmax and cveltimescale
+                    if 'cmax' not in self.orlanski.keys(): 
+                        self.orlanski['cmax'] = 0.45
+                    if 'cveltimescale' not in self.orlanski.keys(): 
+                        self.orlanski['cveltimescale'] = 1000
+                else:
+                    self.obparams['useorlanski'+obc] = False
 
                 for var in self.obcs[obc].fields.keys():
                     self.namelists['data.obcs']['obcs_parm01'][
                         self.obcs[obc].namelistnames[var]] = (
                         self.obcs[obc].filenames[var] )    
+
 
         if self.mnc:
             self.pkgs['usemnc'] = True
@@ -679,10 +756,14 @@ class Model:
 
             # Paste-in new vars
             for nml in self.namelists[nmlfile].keys():
-                for var in self.namelists[nmlfile][nml].keys():
-                    fullnamelists[nmlfile][nml][var] = (
-                        self.namelists[nmlfile][nml][var])
-
+                try:
+                    for var in self.namelists[nmlfile][nml].keys():
+                        fullnamelists[nmlfile][nml][var] = (
+                            self.namelists[nmlfile][nml][var])
+                except KeyError:
+                    fullnamelists[nmlfile][nml] = f90nml.Namelist(
+                        self.namelists[nmlfile][nml])
+                    
         # Homogenize references to 'r' or 'z' in data namelist
         fullnamelists['data'] = gcmutils.correctdatanamelist(
             fullnamelists['data'], correctto='z')
@@ -819,3 +900,8 @@ class RectangularModel(Model):
         self.zc = self.z
 
         self.Y, self.X, self.Z = np.meshgrid(self.y, self.x, self.z)
+
+
+    def stretchgridedge(self, edge, width=1, factor=2, 
+        stretching='linear'): 
+        """ Coarsen the grid at boundaries and refine in center. """

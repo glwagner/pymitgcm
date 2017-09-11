@@ -6,7 +6,8 @@ from . import gcmutils
 
 
 class OpenBoundaryCondition:
-    def __init__(self, model, edge, nt=1, dt=None):
+    def __init__(self, model, edge, nt=1, dt=None, copyic=None, 
+        orlanski=False):
         """ Instantiate an open boundary condition for an MITgcm model. 
 
         Args:
@@ -16,6 +17,11 @@ class OpenBoundaryCondition:
                 or east).
 
             nt (int): The number of time-points on the obc.
+
+            dt (float): The time-interval between open boundary conditions.
+            
+            ic: A pymitgcm initial condition to be continued into the open 
+                boundary.
         """
 
         filenameform = 'obc_{}_{}.bin'
@@ -40,21 +46,25 @@ class OpenBoundaryCondition:
         if edge is 'south':
             self.n = model.x
             self.nn = model.nx
+            # MITgcm indices
             self.I = np.arange(1, model.nx+1)
             self.J = np.ones((model.nx,), dtype=np.int64)
         elif edge is 'north':
             self.n = model.x
             self.nn = model.nx
+            # MITgcm indices
             self.I = np.arange(1, model.nx+1)
             self.J = model.ny * np.ones((model.nx,), dtype=np.int64)
         elif edge is 'west':
             self.n = model.y
             self.nn = model.ny
+            # MITgcm indices
             self.I = np.ones((model.ny,), dtype=np.int64)
             self.J = np.arange(1, model.ny+1)
         elif edge is 'east':
             self.n = model.y
             self.nn = model.ny
+            # MITgcm indices
             self.I = model.nx * np.ones((model.ny,), dtype=np.int64)
             self.J = np.arange(1, model.ny+1)
 
@@ -62,6 +72,10 @@ class OpenBoundaryCondition:
         self.edge = edge
         self.nz = model.nz
         self.fields = {}
+        self.orlanski = orlanski
+
+        if copyic is not None:
+            self.copy_ic(copyic)
 
 
     def save(self, savepath):
@@ -125,6 +139,7 @@ class OpenBoundaryCondition:
         """ Continue an initial condition into the open boundary """
 
         for fieldname, field in ic.fields.items():
-            self.fields[fieldname] = field[self.I, self.J, :].squeeze()
-            self.fields[fieldname] *= np.ones((self.nn, self.nz, self.nt))
+            self.fields[fieldname] = field[self.I-1, self.J-1, :]
 
+            #self.fields[fieldname] = (self.fields[fieldname]*
+            #    np.ones((self.nn, self.nz, self.nt)))

@@ -94,7 +94,8 @@ def rungcm(runpath, buildpath=None, inputpath=None, overwrite=False,
 
 
 
-def genmake(gcmpath, optfile=None, mpi=False, mnc=True, buildpath=None):
+def genmake(gcmpath, optfile=None, mpi=False, mnc=True, buildpath=None, 
+    obcs=True):
     """ Execute MITgcm's 'genmake2' with appropriate compile options in the 
     build directory.
     
@@ -120,6 +121,7 @@ def genmake(gcmpath, optfile=None, mpi=False, mnc=True, buildpath=None):
 
     options['mods']    = "-mods=../code/"
     options['rootdir'] = "-rootdir={}".format(gcmpath)
+    options['obcs']    = "-enable=obcs" if obcs else "-disable=obcs"
 
     if mnc: options['mnc'] = "-enable=mnc"
     if mpi: options['mpi'] = "-mpi"

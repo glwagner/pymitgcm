@@ -101,10 +101,18 @@ class InitialCondition:
         T = Tz*self.model.z
         T += T0 - T.min()
 
+        # Set reference temp
+        self.model.Tref = gcmutils.truncate(T, digits=4)
+
+        # Broadcast 1D profile to 3D initial condition
         self.set_theta(
               np.ones((self.nx, self.ny))[:, :, np.newaxis]
             * T[np.newaxis, np.newaxis, :]
         )
+
+        # Set continuous equation parameters
+        self.model.eqns['talpha'] = alpha
+        self.model.eqns['gravity'] = g
 
 
     def add_barotropic_flow(self, U=0.0, V=0.0):
