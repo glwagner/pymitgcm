@@ -558,7 +558,7 @@ class Model:
         elif hasattr(self, 'ic') and 'T' in self.ic.fields.keys():
             self.Tref = self.ic.fields['T'].mean(axis=(0, 1))
        
-        if not hasattr(self, 'Tref'):
+        if not hasattr(self, 'Tref'): # set default Tref:
             self.Tref = [0.0]*self.nz
 
         self.Tref = gcmutils.truncate(self.Tref, digits=4)
@@ -572,7 +572,7 @@ class Model:
         elif hasattr(self, 'ic') and 'S' in self.ic.fields.keys():
             self.Sref = self.ic.fields['S'].mean(axis=(0, 1))
         
-        if not hasattr(self, 'Sref'):
+        if not hasattr(self, 'Sref'): # set default Sref:
             self.Sref = [35.0]*self.nz
 
         self.Sref = gcmutils.truncate(self.Sref, digits=5)
@@ -587,7 +587,7 @@ class Model:
         # Horizontal tiling
         try:
             self.tiling = gcmutils.getcompacttiling(
-                self.nx, self.nx, self.nprun)
+                self.nx, self.ny, self.nprun)
             
             self.size['sNx'] = int(self.nx/self.tiling[0])
             self.size['sNy'] = int(self.ny/self.tiling[1])
