@@ -1,4 +1,4 @@
-""" Test compiling and running MITgcm's exp4 verification experiment. """
+""" Test changing parameter values. """
 
 import os, sys; sys.path.append('../../')
 sys.path.append('.')
